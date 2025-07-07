@@ -1,0 +1,100 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                String    @id @default(cuid())
+  email             String    @unique
+  username          String    @unique
+  password          String
+  avatar            String?
+  joinDate          DateTime  @default(now())
+  currentStreak     Int       @default(0)
+  longestStreak     Int       @default(0)
+  totalWordsLearned Int       @default(0)
+  dailyGoal         Int       @default(10)
+  learningLanguage  String    @default("English") // "English", "Korean", "Chinese", etc.
+  lastActiveDate    DateTime?
+  
+  // Связи
+  words             Word[]
+  reviews           Review[]
+  friends           Friendship[] @relation("UserFriends")
+  friendOf          Friendship[] @relation("FriendOfUser")
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  
+  @@map("users")
+}
+
+model Word {
+  id              String   @id @default(cuid())
+  word            String
+  translation     String
+  transcription   String?
+  example         String?
+  tags            String[] // Массив тегов
+  
+  // Алгоритм интервального повторения
+  masteryLevel    Int      @default(0) // 0-5
+  currentInterval Int      @default(1) // дни
+  lastReviewDate  DateTime @default(now())
+  nextReviewDate  DateTime @default(now())
+  
+  // Связи
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reviews         Review[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@map("words")
+}
+
+model Review {
+  id       String @id @default(cuid())
+  rating   Int    // 1-4 (согласно ТЗ)
+  
+  // Связи
+  wordId   String
+  word     Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
+  userId   String
+  user     User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt DateTime @default(now())
+  
+  @@map("reviews")
+}
+
+model Friendship {
+  id       String @id @default(cuid())
+  
+  userId   String
+  user     User   @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
+  
+  friendId String
+  friend   User   @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
+  
+  status   FriendshipStatus @default(PENDING)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([userId, friendId])
+  @@map("friendships")
+}
+
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
