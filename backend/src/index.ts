@@ -10,6 +10,7 @@ import userRoutes from './routes/users';
 import wordRoutes from './routes/words';
 import reviewRoutes from './routes/reviews';
 import friendshipRoutes from './routes/friendships';
+import statsRoutes from './routes/stats';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -45,7 +46,8 @@ app.get('/api/health', (req, res) => {
   res.json({ 
     status: 'OK', 
     timestamp: new Date().toISOString(),
-    service: 'Language Learning API'
+    service: 'Language Learning API',
+    version: '1.0.0'
   });
 });
 
@@ -55,12 +57,26 @@ app.use('/api/users', userRoutes);
 app.use('/api/words', wordRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/friendships', friendshipRoutes);
+app.use('/api/stats', statsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({ 
     error: 'Route not found',
-    path: req.originalUrl 
+    path: req.originalUrl,
+    availableRoutes: [
+      'GET /api/health',
+      'POST /api/auth/register',
+      'POST /api/auth/login',
+      'GET /api/auth/me',
+      'GET /api/words',
+      'POST /api/words',
+      'GET /api/words/due',
+      'GET /api/words/stats',
+      'POST /api/reviews',
+      'GET /api/reviews/session/start',
+      'GET /api/stats'
+    ]
   });
 });
 
@@ -71,6 +87,11 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📊 Health check: http://localhost:${PORT}/api/health`);
   console.log(`🌐 External access: http://5.129.203.118:${PORT}/api/health`);
+  console.log(`📚 API Documentation:`);
+  console.log(`   - Words: /api/words`);
+  console.log(`   - Reviews: /api/reviews`);
+  console.log(`   - Statistics: /api/stats`);
+  console.log(`   - Authentication: /api/auth`);
 });
 
 export default app;
