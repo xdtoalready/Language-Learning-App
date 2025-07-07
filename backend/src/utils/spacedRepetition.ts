@@ -74,6 +74,21 @@ export function updateWordAfterReview(review: WordReview): UpdatedWordData {
 }
 
 /**
+ * Упрощенная версия функции для обратной совместимости
+ * @param currentMasteryLevel Текущий уровень мастерства
+ * @param rating Оценка (1-4)
+ * @returns Обновленные параметры слова
+ */
+export function updateWordProgress(currentMasteryLevel: number, rating: number): UpdatedWordData {
+  return updateWordAfterReview({
+    wordId: '', // не используется в алгоритме
+    rating,
+    currentMasteryLevel,
+    lastReviewDate: new Date()
+  });
+}
+
+/**
  * Проверяет, нужно ли повторять слово сегодня
  * @param word Данные слова
  * @param currentDate Текущая дата (по умолчанию - сегодня)

@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { updateWordProgress } from '../utils/spacedRepetition';
+import { updateWordAfterReview } from '../utils/spacedRepetition';
 
 const prisma = new PrismaClient();
 
@@ -45,7 +45,12 @@ export const submitReview = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     // Рассчитываем новые параметры через алгоритм интервального повторения
-    const updatedParams = updateWordProgress(word.masteryLevel, rating);
+    const updatedParams = updateWordAfterReview({
+      wordId,
+      rating,
+      currentMasteryLevel: word.masteryLevel,
+      lastReviewDate: word.lastReviewDate || new Date()
+    });
 
     // Обновляем слово в транзакции
     const result = await prisma.$transaction(async (tx) => {

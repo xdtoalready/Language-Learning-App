@@ -197,7 +197,7 @@ export const getDifficultWords = async (req: AuthRequest, res: Response): Promis
     // Рассчитываем сложность для каждого слова
     const wordsWithDifficulty = difficultWords.map(word => {
       const reviews = word.reviews;
-      if (reviews.length === 0) return { ...word, difficulty: 0 };
+      if (reviews.length === 0) return { ...word, difficulty: 0, reviewCount: 0 };
 
       // Рассчитываем средний рейтинг (чем ниже, тем сложнее)
       const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length;
