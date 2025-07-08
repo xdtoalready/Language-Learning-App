@@ -1,7 +1,7 @@
 // components/layout/DashboardLayout.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -15,7 +15,7 @@ import {
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
-import { useAuth, useStore } from '@/store/useStore';
+import { useAuth } from '@/store/useStore';
 import { Button } from '@/components/ui/Button';
 
 interface DashboardLayoutProps {
@@ -30,73 +30,25 @@ const navigation = [
 ];
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, isAuthenticated, logout, initializeAuth } = useAuth();
+  const { user, isAuthenticated, isLoading, isInitialized, logout, initializeAuth } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [isInitializing, setIsInitializing] = useState(true);
-  const [hasInitialized, setHasInitialized] = useState(false);
 
+  // Инициализируем auth если еще не инициализирован
   useEffect(() => {
-    // Предотвращаем множественные инициализации
-    if (hasInitialized) {
-      console.log('🛑 DashboardLayout: Инициализация уже выполнена, пропускаем');
-      setIsInitializing(false);
-      return;
+    if (!isInitialized) {
+      console.log('🔄 DashboardLayout: Запуск инициализации...');
+      initializeAuth();
     }
+  }, [isInitialized, initializeAuth]);
 
-    const initialize = async () => {
-      console.log('🔄 DashboardLayout: Инициализация...');
-      
-      try {
-        // Инициализируем аутентификацию только один раз
-        initializeAuth();
-        setHasInitialized(true);
-        
-        // Даем небольшое время на проверку токена и загрузку профиля
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // ИСПРАВЛЕНО: используем useStore.getState() вместо useAuth.getState()
-        const currentAuth = useStore.getState().isAuthenticated;
-        const currentUser = useStore.getState().user;
-        
-        console.log('📊 Результат инициализации:', { 
-          isAuthenticated: currentAuth,
-          hasUser: !!currentUser,
-          userEmail: currentUser?.email
-        });
-        
-        if (!currentAuth) {
-          console.log('❌ Пользователь не авторизован, редирект на /auth');
-          router.push('/auth');
-          return;
-        }
-        
-        // Если авторизован, но нет пользователя - даем время на загрузку
-        if (currentAuth && !currentUser) {
-          console.log('⏳ Ожидаем загрузку профиля пользователя...');
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // ИСПРАВЛЕНО: используем useStore.getState() вместо useAuth.getState()
-          const finalUser = useStore.getState().user;
-          if (!finalUser) {
-            console.log('❌ Не удалось загрузить профиль, редирект на /auth');
-            logout();
-            router.push('/auth');
-            return;
-          }
-        }
-        
-        console.log('✅ Инициализация завершена успешно');
-      } catch (error) {
-        console.error('💥 Ошибка инициализации DashboardLayout:', error);
-        router.push('/auth');
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    initialize();
-  }, [initializeAuth, logout, router, hasInitialized]);
+  // Проверяем авторизацию после инициализации
+  useEffect(() => {
+    if (isInitialized && !isLoading && !isAuthenticated) {
+      console.log('❌ DashboardLayout: Пользователь не авторизован, редирект на /auth');
+      router.push('/auth');
+    }
+  }, [isInitialized, isLoading, isAuthenticated, router]);
 
   const handleLogout = () => {
     logout();
@@ -104,8 +56,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     router.push('/auth');
   };
 
-  // Показываем загрузку во время инициализации
-  if (isInitializing) {
+  // Показываем загрузку во время инициализации или если нет пользователя
+  if (!isInitialized || isLoading || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -115,20 +67,13 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           </div>
           <div className="space-y-2">
             <h2 className="text-xl font-semibold text-gray-800">Language Learning App</h2>
-            <p className="text-gray-600">Проверка аутентификации...</p>
+            <p className="text-gray-600">
+              {!isInitialized ? 'Инициализация...' :
+               isLoading ? 'Загрузка профиля...' :
+               !isAuthenticated ? 'Проверка авторизации...' :
+               'Подготовка интерфейса...'}
+            </p>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Показываем загрузку если нет пользователя
-  if (!isAuthenticated || !user) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">Загрузка профиля...</p>
         </div>
       </div>
     );

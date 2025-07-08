@@ -8,7 +8,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  isInitialized: boolean; // 🔥 Новое поле для отслеживания инициализации
+  isInitialized: boolean;
 }
 
 interface WordsState {
@@ -37,7 +37,7 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   register: (email: string, username: string, password: string, learningLanguage: string) => Promise<void>;
   logout: () => void;
   loadProfile: () => Promise<void>;
-  initializeAuth: () => void;
+  initializeAuth: () => Promise<void>; // 🔥 Теперь асинхронная!
   
   // Words actions
   loadWords: (params?: any) => Promise<void>;
@@ -93,9 +93,9 @@ const hasValidToken = (): boolean => {
 export const useStore = create<AppStore>((set, get) => ({
   // Initial state
   user: null,
-  isAuthenticated: false, // 🔥 Изначально false, проверим в initializeAuth
+  isAuthenticated: false,
   isLoading: false,
-  isInitialized: false, // 🔥 Новое поле
+  isInitialized: false,
   words: [],
   dueWords: [],
   currentWord: null,
@@ -108,29 +108,66 @@ export const useStore = create<AppStore>((set, get) => ({
   hasMoreWords: false,
   remainingWords: 0,
 
-  // Инициализация аутентификации
-  initializeAuth: () => {
+  // 🔥 УПРОЩЕННАЯ инициализация аутентификации
+  initializeAuth: async () => {
+    const state = get();
+    
     // Предотвращаем множественные инициализации
-    if (get().isInitialized) {
+    if (state.isInitialized) {
       console.log('🛑 Store уже инициализирован, пропускаем');
       return;
     }
 
     console.log('🔄 Инициализация аутентификации...');
-    const hasToken = hasValidToken();
-    console.log('🔑 Проверка токена:', hasToken ? 'валидный' : 'отсутствует/невалидный');
+    set({ isLoading: true });
     
-    set({ 
-      isAuthenticated: hasToken,
-      isInitialized: true // 🔥 Помечаем как инициализированный
-    });
-    
-    // Если токен есть, но пользователя нет - загружаем профиль
-    if (hasToken && !get().user) {
-      console.log('📱 Загружаем профиль пользователя...');
-      get().loadProfile().catch((error) => {
-        console.error('❌ Ошибка загрузки профиля:', error);
-        get().logout();
+    try {
+      const hasToken = hasValidToken();
+      console.log('🔑 Проверка токена:', hasToken ? 'валидный' : 'отсутствует/невалидный');
+      
+      if (!hasToken) {
+        // Нет валидного токена
+        console.log('❌ Нет токена, устанавливаем не авторизован');
+        set({ 
+          isAuthenticated: false, 
+          user: null, 
+          isLoading: false,
+          isInitialized: true 
+        });
+        return;
+      }
+
+      // Есть токен, пробуем загрузить профиль
+      console.log('📱 Есть токен, загружаем профиль...');
+      
+      try {
+        const response = await apiClient.getProfile();
+        console.log('✅ Профиль загружен успешно:', response.user.email);
+        
+        set({ 
+          user: response.user,
+          isAuthenticated: true,
+          isLoading: false,
+          isInitialized: true
+        });
+      } catch (profileError) {
+        console.error('❌ Ошибка загрузки профиля:', profileError);
+        // Токен невалидный или истек
+        localStorage.removeItem('auth_token');
+        set({ 
+          isAuthenticated: false, 
+          user: null, 
+          isLoading: false,
+          isInitialized: true 
+        });
+      }
+    } catch (error) {
+      console.error('💥 Ошибка инициализации:', error);
+      set({ 
+        isAuthenticated: false, 
+        user: null, 
+        isLoading: false,
+        isInitialized: true 
       });
     }
   },
@@ -139,11 +176,11 @@ export const useStore = create<AppStore>((set, get) => ({
   login: async (emailOrUsername: string, password: string) => {
     set({ isLoading: true });
     try {
-      console.log('🔑 Пытаемся войти:', { emailOrUsername, password: '***' });
+      console.log('🔑 Попытка входа:', { emailOrUsername });
       
       const response = await apiClient.login({ emailOrUsername, password });
       
-      console.log('✅ Успешный вход:', response);
+      console.log('✅ Успешный вход:', response.user.email);
       
       set({
         user: response.user,
@@ -160,12 +197,7 @@ export const useStore = create<AppStore>((set, get) => ({
   register: async (email: string, username: string, password: string, learningLanguage: string) => {
     set({ isLoading: true });
     try {
-      console.log('📝 Пытаемся зарегистрироваться:', { 
-        email, 
-        username, 
-        password: '***', 
-        learningLanguage 
-      });
+      console.log('📝 Попытка регистрации:', { email, username, learningLanguage });
       
       const response = await apiClient.register({ 
         email, 
@@ -174,7 +206,7 @@ export const useStore = create<AppStore>((set, get) => ({
         learningLanguage 
       });
       
-      console.log('✅ Успешная регистрация:', response);
+      console.log('✅ Успешная регистрация:', response.user.email);
       
       set({
         user: response.user,
@@ -194,7 +226,7 @@ export const useStore = create<AppStore>((set, get) => ({
     set({
       user: null,
       isAuthenticated: false,
-      isInitialized: false, // 🔥 Сбрасываем инициализацию
+      isInitialized: false, // Сброс для возможности повторной инициализации
       words: [],
       dueWords: [],
       userStats: null,
@@ -208,7 +240,7 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       console.log('👤 Загружаем профиль пользователя...');
       const response = await apiClient.getProfile();
-      console.log('✅ Профиль загружен:', response.user);
+      console.log('✅ Профиль загружен:', response.user.email);
       
       set({ 
         user: response.user,
@@ -216,7 +248,6 @@ export const useStore = create<AppStore>((set, get) => ({
       });
     } catch (error) {
       console.error('❌ Ошибка загрузки профиля:', error);
-      // Если токен невалидный, разлогиниваем
       get().logout();
       throw error;
     }
@@ -396,7 +427,7 @@ export const useAuth = () => useStore((state) => ({
   user: state.user,
   isAuthenticated: state.isAuthenticated,
   isLoading: state.isLoading,
-  isInitialized: state.isInitialized, // 🔥 Добавляем в хук
+  isInitialized: state.isInitialized,
   login: state.login,
   register: state.register,
   logout: state.logout,

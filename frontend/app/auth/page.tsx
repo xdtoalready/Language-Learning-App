@@ -20,18 +20,24 @@ export default function AuthPage() {
     learningLanguage: 'Korean'
   });
   
-  const { login, register, isLoading, isAuthenticated, isInitialized } = useAuth();
+  const { login, register, isLoading, isAuthenticated, isInitialized, initializeAuth } = useAuth();
   const router = useRouter();
-  const [hasRedirected, setHasRedirected] = useState(false);
 
-  // Редирект если уже авторизован, но только после инициализации
+  // Инициализируем auth если еще не инициализирован
   useEffect(() => {
-    if (isInitialized && isAuthenticated && !hasRedirected) {
-      console.log('🔄 AuthPage: Пользователь уже авторизован, перенаправляем на dashboard');
-      setHasRedirected(true);
+    if (!isInitialized) {
+      console.log('🔄 AuthPage: Запуск инициализации...');
+      initializeAuth();
+    }
+  }, [isInitialized, initializeAuth]);
+
+  // Редирект если уже авторизован (только после инициализации)
+  useEffect(() => {
+    if (isInitialized && isAuthenticated) {
+      console.log('✅ AuthPage: Пользователь уже авторизован, переход на dashboard');
       router.push('/dashboard');
     }
-  }, [isAuthenticated, isInitialized, router, hasRedirected]);
+  }, [isInitialized, isAuthenticated, router]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,25 +72,15 @@ export default function AuthPage() {
     });
   };
 
-  // Показываем загрузку если еще не инициализировано
-  if (!isInitialized) {
+  // Показываем загрузку если еще не инициализировано или если уже авторизован
+  if (!isInitialized || isAuthenticated) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">Инициализация...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Показываем страницу авторизации только если не авторизован
-  if (isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">Перенаправление...</p>
+          <p className="text-gray-600">
+            {!isInitialized ? 'Инициализация...' : 'Перенаправление...'}
+          </p>
         </div>
       </div>
     );
