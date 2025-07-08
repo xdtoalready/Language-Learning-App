@@ -27,7 +27,7 @@ export const Input: React.FC<InputProps> = ({
   const currentVariant = error ? 'error' : variant;
 
   return (
-    <div className="space-y-1">
+    <div className="space-y-1 mb-4">
       {label && (
         <label className="block text-sm font-medium text-gray-700">
           {label}

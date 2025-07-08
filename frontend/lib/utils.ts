@@ -237,10 +237,10 @@ export const LANGUAGES = {
 };
 
 export const MASTERY_LEVELS = [
-  { value: 0, label: 'Новое', color: 'gray' },
-  { value: 1, label: 'Изучается', color: 'red' },
-  { value: 2, label: 'Знакомое', color: 'orange' },
-  { value: 3, label: 'Знаю', color: 'yellow' },
-  { value: 4, label: 'Хорошо знаю', color: 'blue' },
-  { value: 5, label: 'Выучено', color: 'green' }
+  { name: 'Новое', color: 'bg-gray-500' },
+  { name: 'Изучается', color: 'bg-red-500' },
+  { name: 'Знакомое', color: 'bg-orange-500' },
+  { name: 'Знаю', color: 'bg-yellow-500' },
+  { name: 'Хорошо знаю', color: 'bg-blue-500' },
+  { name: 'Выучено', color: 'bg-green-500' }
 ];

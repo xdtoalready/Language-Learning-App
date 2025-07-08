@@ -224,7 +224,7 @@ const handleRemoveTag = (tagToRemove: string) => {
 
                 {/* Теги */}
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
                     Теги
                   </label>
                   

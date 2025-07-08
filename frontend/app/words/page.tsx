@@ -166,40 +166,64 @@ export default function WordsPage() {
 
         {/* Статистика */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.2 }}
+        className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8"
         >
-          <Card>
+        <Card>
             <CardContent className="p-6">
-              <div className="flex items-center">
+            <div className="flex items-center">
                 <BookOpenIcon className="h-8 w-8 text-blue-500" />
                 <div className="ml-4">
-                  <p className="text-sm font-medium text-gray-600">Всего слов</p>
-                  <p className="text-2xl font-bold text-gray-900">{words.length}</p>
+                <p className="text-sm font-medium text-gray-600">Всего слов</p>
+                <p className="text-2xl font-bold text-gray-900">{words.length}</p>
                 </div>
-              </div>
+            </div>
             </CardContent>
-          </Card>
+        </Card>
 
-          {/* Добавить еще статистику по уровням мастерства */}
-          {MASTERY_LEVELS.slice(0, 3).map((level, index) => {
-            const count = words.filter(word => word.masteryLevel === index).length;
-            return (
-              <Card key={`mastery-${index}-${level.name}`}>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className={`w-3 h-3 rounded-full ${level.color}`}></div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">{level.name}</p>
-                      <p className="text-2xl font-bold text-gray-900">{count}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
+        <Card>
+            <CardContent className="p-6">
+            <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-red-500"></div>
+                <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">К повторению</p>
+                <p className="text-2xl font-bold text-gray-900">
+                    {words.filter(word => word.masteryLevel < 5 && new Date(word.nextReviewDate) <= new Date()).length}
+                </p>
+                </div>
+            </div>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardContent className="p-6">
+            <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-yellow-500"></div>
+                <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Изучается</p>
+                <p className="text-2xl font-bold text-gray-900">
+                    {words.filter(word => word.masteryLevel > 0 && word.masteryLevel < 5).length}
+                </p>
+                </div>
+            </div>
+            </CardContent>
+        </Card>
+
+        <Card>
+            <CardContent className="p-6">
+            <div className="flex items-center">
+                <div className="w-3 h-3 rounded-full bg-green-500"></div>
+                <div className="ml-4">
+                <p className="text-sm font-medium text-gray-600">Выучено</p>
+                <p className="text-2xl font-bold text-gray-900">
+                    {words.filter(word => word.masteryLevel === 5).length}
+                </p>
+                </div>
+            </div>
+            </CardContent>
+        </Card>
         </motion.div>
 
         {/* Поиск и фильтры */}
