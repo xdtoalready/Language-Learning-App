@@ -13,12 +13,12 @@ import {
   ChevronRightIcon,
   BookOpenIcon
 } from '@heroicons/react/24/outline';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Button } from '@/components/ui/Button';
+import { Input } from '@/components/ui/Input';
+import { Card, CardContent, CardHeader } from '@/components/ui/Card';
+import { Badge } from '@/components/ui/Badge';
 import { apiClient } from '@/lib/api';
 import { toast } from 'react-hot-toast';
-import { debounce } from '@/lib/utils';
 
 interface FriendWord {
   id: string;
