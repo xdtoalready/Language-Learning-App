@@ -6,6 +6,7 @@ import {
   respondToFriendRequest,
   getFriends,
   getPendingRequests,
+  getFriendsWithClouds,
   removeFriend
 } from '../controllers/friendshipController';
 import { authenticateToken } from '../middleware/auth';
