@@ -180,47 +180,6 @@ export default function FriendsPage() {
           </Button>
         </div>
 
-        {/* Информация о системе облачков */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-        >
-          <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-6">
-                <div className="text-4xl">💬</div>
-                <div className="flex-1">
-                  <h3 className="font-semibold text-lg text-gray-900 mb-2">
-                    Система облачков мотивации
-                  </h3>
-                  <p className="text-gray-700 text-sm mb-4">
-                    Изучайте языки вместе с друзьями! Когда вы оба выполняете дневную норму (повторяете слова), 
-                    ваше общее облачко растет и становится красивее:
-                  </p>
-                  <div className="flex items-center gap-8">
-                    <div className="flex items-center gap-3">
-                      <CloudStreak days={3} size="sm" />
-                      <span className="text-xs text-gray-600">1-5 дней</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <CloudStreak days={8} size="sm" />
-                      <span className="text-xs text-gray-600">6-10 дней</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <CloudStreak days={15} size="sm" />
-                      <span className="text-xs text-gray-600">11-20 дней</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <CloudStreak days={25} size="sm" />
-                      <span className="text-xs text-gray-600">21+ дней</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </motion.div>
-
         {/* Вкладки */}
         <div className="border-b border-gray-200">
           <nav className="flex space-x-8">
