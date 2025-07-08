@@ -85,7 +85,13 @@ export const submitReview = async (req: AuthRequest, res: Response): Promise<voi
         }
       });
 
-      await updateUserActivity(userId);
+      try {
+        await updateUserActivity(userId);
+        console.log('✅ Активность пользователя для друзей обновлена');
+        } catch (error) {
+        console.error('❌ Ошибка обновления активности друзей:', error);
+    // Не прерываем выполнение, если облачки не удалось обновить
+    }
 
       let updateData: any = {};
       const today = new Date();
