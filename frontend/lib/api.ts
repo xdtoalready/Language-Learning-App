@@ -165,6 +165,18 @@ if (contentType && contentType.includes('application/json')) {
     return response;
   }
 
+  async updateProfile(updates: {
+    username?: string;
+    learningLanguage?: string;
+    dailyGoal?: number;
+    avatar?: string;
+  }): Promise<{ message: string; user: User }> {
+    return this.request<{ message: string; user: User }>('/auth/profile', {
+      method: 'PUT',
+      body: JSON.stringify(updates),
+    });
+  }
+
   async getProfile(): Promise<{ user: User }> {
     return this.request<{ user: User }>('/auth/me');
   }

@@ -194,6 +194,94 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 };
 
 /**
+ * Обновление профиля пользователя
+ */
+export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = (req as any).userId;
+    const { username, learningLanguage, dailyGoal, avatar } = req.body;
+
+    // Проверяем, что пользователь существует
+    const existingUser = await prisma.user.findUnique({
+      where: { id: userId }
+    });
+
+    if (!existingUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Подготавливаем данные для обновления
+    const updateData: any = {};
+
+    if (username !== undefined) {
+      // Проверяем уникальность username (если он изменился)
+      if (username !== existingUser.username) {
+        const usernameExists = await prisma.user.findFirst({
+          where: {
+            username: username.toLowerCase(),
+            id: { not: userId }
+          }
+        });
+
+        if (usernameExists) {
+          res.status(400).json({ error: 'Username already taken' });
+          return;
+        }
+      }
+      updateData.username = username.toLowerCase();
+    }
+
+    if (learningLanguage !== undefined) {
+      updateData.learningLanguage = learningLanguage;
+    }
+
+    if (dailyGoal !== undefined) {
+      // Валидация дневной цели
+      const goal = parseInt(dailyGoal);
+      if (isNaN(goal) || goal < 1 || goal > 100) {
+        res.status(400).json({ 
+          error: 'Daily goal must be between 1 and 100' 
+        });
+        return;
+      }
+      updateData.dailyGoal = goal;
+    }
+
+    if (avatar !== undefined) {
+      updateData.avatar = avatar;
+    }
+
+    // Обновляем пользователя
+    const updatedUser = await prisma.user.update({
+      where: { id: userId },
+      data: updateData,
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        avatar: true,
+        learningLanguage: true,
+        currentStreak: true,
+        longestStreak: true,
+        totalWordsLearned: true,
+        dailyGoal: true,
+        joinDate: true
+      }
+    });
+
+    res.json({
+      message: 'Profile updated successfully',
+      user: updatedUser
+    });
+
+  } catch (error) {
+    console.error('Update profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Получение информации о текущем пользователе
  */
 export const getMe = async (req: Request, res: Response): Promise<void> => {

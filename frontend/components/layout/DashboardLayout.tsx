@@ -11,6 +11,7 @@ import {
   ChartBarIcon,
   PlusIcon,
   UserIcon,
+  UsersIcon,
   Cog6ToothIcon,
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
@@ -26,6 +27,7 @@ const navigation = [
   { name: 'Дашборд', href: '/dashboard', icon: HomeIcon },
   { name: 'Мои слова', href: '/words', icon: BookOpenIcon },
   { name: 'Статистика', href: '/stats', icon: ChartBarIcon },
+  { name: 'Друзья', href: '/friends', icon: UsersIcon },
   { name: 'Добавить слово', href: '/words/new', icon: PlusIcon },
 ];
 

@@ -24,5 +24,6 @@ router.post('/login', login);
  * @access  Private
  */
 router.get('/me', authenticateToken, getMe);
+router.put('/profile', authenticateToken, updateProfile);
 
 export default router;

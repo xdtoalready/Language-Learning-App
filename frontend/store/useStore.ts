@@ -6,9 +6,23 @@ import apiClient from '@/lib/api';
 
 interface AuthState {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   isInitialized: boolean;
+}
+
+interface AuthActions {
+  login: (emailOrUsername: string, password: string) => Promise<void>;
+  register: (email: string, username: string, password: string, learningLanguage: string) => Promise<void>;
+  logout: () => void;
+  initializeAuth: () => Promise<void>;
+  updateProfile: (updates: Partial<{
+    username: string;
+    learningLanguage: string;
+    dailyGoal: number;
+    avatar: string;
+  }>) => Promise<void>;
 }
 
 interface WordsState {
@@ -37,7 +51,9 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   register: (email: string, username: string, password: string, learningLanguage: string) => Promise<void>;
   logout: () => void;
   loadProfile: () => Promise<void>;
-  initializeAuth: () => Promise<void>; // 🔥 Теперь асинхронная!
+  initializeAuth: () => Promise<void>;
+  updateProfile: (updates: { username?: string; learningLanguage?: string; dailyGoal?: number; avatar?: string; }) => Promise<void>;
+  
   
   // Words actions
   loadWords: (params?: any) => Promise<void>;
@@ -253,6 +269,33 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
+   updateProfile: async (updates: { username?: string; learningLanguage?: string; dailyGoal?: number; avatar?: string; }) => {
+    const { isAuthenticated } = get();
+    
+    if (!isAuthenticated) {
+      throw new Error('User not authenticated');
+    }
+
+    set({ isLoading: true });
+
+    try {
+      console.log('🔄 Обновляем профиль:', updates);
+      
+      const response = await apiClient.updateProfile(updates);
+      
+      set({ 
+        user: response.user,
+        isLoading: false 
+      });
+      
+      console.log('✅ Профиль обновлен:', response.user);
+    } catch (error) {
+      set({ isLoading: false });
+      console.error('❌ Ошибка обновления профиля:', error);
+      throw error;
+    }
+  },
+
   // Words actions
   loadWords: async (params?: any) => {
     // Предотвращаем множественные одновременные запросы
@@ -450,7 +493,8 @@ export const useAuth = () => useStore((state) => ({
   register: state.register,
   logout: state.logout,
   loadProfile: state.loadProfile,
-  initializeAuth: state.initializeAuth
+  initializeAuth: state.initializeAuth,
+  updateProfile: state.updateProfile
 }));
 
 export const useWords = () => useStore((state) => ({
