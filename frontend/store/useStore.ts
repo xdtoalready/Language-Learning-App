@@ -8,6 +8,7 @@ interface AuthState {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
+  isInitialized: boolean; // 🔥 Новое поле для отслеживания инициализации
 }
 
 interface WordsState {
@@ -90,10 +91,11 @@ const hasValidToken = (): boolean => {
 };
 
 export const useStore = create<AppStore>((set, get) => ({
-  // Initial state - ИСПРАВЛЕНО: проверяем токен при инициализации
+  // Initial state
   user: null,
-  isAuthenticated: hasValidToken(), // 🔥 КЛЮЧЕВОЕ ИЗМЕНЕНИЕ!
+  isAuthenticated: false, // 🔥 Изначально false, проверим в initializeAuth
   isLoading: false,
+  isInitialized: false, // 🔥 Новое поле
   words: [],
   dueWords: [],
   currentWord: null,
@@ -108,11 +110,20 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // Инициализация аутентификации
   initializeAuth: () => {
+    // Предотвращаем множественные инициализации
+    if (get().isInitialized) {
+      console.log('🛑 Store уже инициализирован, пропускаем');
+      return;
+    }
+
     console.log('🔄 Инициализация аутентификации...');
     const hasToken = hasValidToken();
     console.log('🔑 Проверка токена:', hasToken ? 'валидный' : 'отсутствует/невалидный');
     
-    set({ isAuthenticated: hasToken });
+    set({ 
+      isAuthenticated: hasToken,
+      isInitialized: true // 🔥 Помечаем как инициализированный
+    });
     
     // Если токен есть, но пользователя нет - загружаем профиль
     if (hasToken && !get().user) {
@@ -183,6 +194,7 @@ export const useStore = create<AppStore>((set, get) => ({
     set({
       user: null,
       isAuthenticated: false,
+      isInitialized: false, // 🔥 Сбрасываем инициализацию
       words: [],
       dueWords: [],
       userStats: null,
@@ -210,12 +222,15 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
-  // Остальные методы остаются без изменений...
+  // Words actions
   loadWords: async (params?: any) => {
     set({ isLoadingWords: true });
     try {
       const response = await apiClient.getWords(params);
-      set({ words: response.words, isLoadingWords: false });
+      set({ 
+        words: response.words,
+        isLoadingWords: false 
+      });
     } catch (error) {
       console.error('Failed to load words:', error);
       set({ isLoadingWords: false });
@@ -224,13 +239,16 @@ export const useStore = create<AppStore>((set, get) => ({
   },
 
   loadDueWords: async () => {
+    set({ isLoadingWords: true });
     try {
-      console.log('📚 Загружаем слова для повторения...');
       const response = await apiClient.getDueWords();
-      console.log('✅ Слова для повторения загружены:', response);
-      set({ dueWords: response.words });
+      set({ 
+        dueWords: response.words,
+        isLoadingWords: false 
+      });
     } catch (error) {
       console.error('Failed to load due words:', error);
+      set({ isLoadingWords: false });
       throw error;
     }
   },
@@ -238,10 +256,14 @@ export const useStore = create<AppStore>((set, get) => ({
   createWord: async (wordData: any) => {
     try {
       const response = await apiClient.createWord(wordData);
-      // Обновляем список слов
-      await get().loadWords();
+      const currentWords = get().words;
+      set({ 
+        words: [...currentWords, response.word],
+        currentWord: response.word 
+      });
+      
+      // Обновляем статистику
       await get().loadWordsStats();
-      return response;
     } catch (error) {
       throw error;
     }
@@ -250,8 +272,13 @@ export const useStore = create<AppStore>((set, get) => ({
   updateWord: async (id: string, wordData: any) => {
     try {
       const response = await apiClient.updateWord(id, wordData);
-      await get().loadWords();
-      return response;
+      const words = get().words.map(word => 
+        word.id === id ? response.word : word
+      );
+      set({ words });
+      
+      // Обновляем статистику
+      await get().loadWordsStats();
     } catch (error) {
       throw error;
     }
@@ -260,7 +287,10 @@ export const useStore = create<AppStore>((set, get) => ({
   deleteWord: async (id: string) => {
     try {
       await apiClient.deleteWord(id);
-      await get().loadWords();
+      const words = get().words.filter(word => word.id !== id);
+      set({ words });
+      
+      // Обновляем статистику
       await get().loadWordsStats();
     } catch (error) {
       throw error;
@@ -269,10 +299,8 @@ export const useStore = create<AppStore>((set, get) => ({
 
   loadWordsStats: async () => {
     try {
-      console.log('📊 Загружаем статистику слов...');
       const response = await apiClient.getWordsStats();
-      console.log('✅ Статистика слов загружена:', response);
-      set({ wordsStats: response.stats || response });
+      set({ wordsStats: response.stats });
     } catch (error) {
       console.error('Failed to load words stats:', error);
       throw error;
@@ -282,12 +310,12 @@ export const useStore = create<AppStore>((set, get) => ({
   // Review actions
   startReviewSession: async () => {
     try {
-      const response = await apiClient.startReviewSession();
+      const response = await apiClient.startReview();
       set({
         isReviewSession: true,
-        currentReviewWord: response.word,
-        hasMoreWords: response.hasMoreWords,
-        remainingWords: response.remainingWords
+        currentReviewWord: response.word || null,
+        hasMoreWords: response.hasMore,
+        remainingWords: response.remainingWords || 0
       });
     } catch (error) {
       throw error;
@@ -296,25 +324,15 @@ export const useStore = create<AppStore>((set, get) => ({
 
   submitReview: async (wordId: string, rating: number) => {
     try {
-      const response = await apiClient.submitReview({ wordId, rating });
+      const response = await apiClient.submitReview(wordId, rating);
+      set({
+        currentReviewWord: response.nextWord || null,
+        hasMoreWords: response.hasMore,
+        remainingWords: response.remainingWords || 0
+      });
       
-      if (response.nextWord) {
-        set({
-          currentReviewWord: response.nextWord,
-          hasMoreWords: response.hasMoreWords,
-          remainingWords: response.remainingWords
-        });
-      } else {
-        set({
-          isReviewSession: false,
-          currentReviewWord: null,
-          hasMoreWords: false,
-          remainingWords: 0
-        });
-      }
-      
-      // Обновляем пользователя и статистику
-      await get().loadProfile();
+      // Обновляем статистику
+      await get().loadWordsStats();
       await get().loadUserStats();
     } catch (error) {
       throw error;
@@ -334,10 +352,11 @@ export const useStore = create<AppStore>((set, get) => ({
   loadUserStats: async () => {
     set({ isLoadingStats: true });
     try {
-      console.log('📈 Загружаем статистику пользователя...');
       const response = await apiClient.getUserStats();
-      console.log('✅ Статистика пользователя загружена:', response);
-      set({ userStats: response, isLoadingStats: false });
+      set({ 
+        userStats: response.stats,
+        isLoadingStats: false 
+      });
     } catch (error) {
       console.error('Failed to load user stats:', error);
       set({ isLoadingStats: false });
@@ -377,6 +396,7 @@ export const useAuth = () => useStore((state) => ({
   user: state.user,
   isAuthenticated: state.isAuthenticated,
   isLoading: state.isLoading,
+  isInitialized: state.isInitialized, // 🔥 Добавляем в хук
   login: state.login,
   register: state.register,
   logout: state.logout,

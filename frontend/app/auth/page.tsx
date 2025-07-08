@@ -20,39 +20,44 @@ export default function AuthPage() {
     learningLanguage: 'Korean'
   });
   
-  const { login, register, isLoading, isAuthenticated } = useAuth();
+  const { login, register, isLoading, isAuthenticated, isInitialized } = useAuth();
   const router = useRouter();
+  const [hasRedirected, setHasRedirected] = useState(false);
 
-  // Редирект если уже авторизован
+  // Редирект если уже авторизован, но только после инициализации
   useEffect(() => {
-    if (isAuthenticated) {
+    if (isInitialized && isAuthenticated && !hasRedirected) {
+      console.log('🔄 AuthPage: Пользователь уже авторизован, перенаправляем на dashboard');
+      setHasRedirected(true);
       router.push('/dashboard');
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, isInitialized, router, hasRedirected]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-        if (isLogin) {
-        // ИСПРАВЛЕНО: передаем emailOrUsername вместо email
+      if (isLogin) {
         await login(formData.email, formData.password);
         toast.success('Добро пожаловать!');
-        } else {
+      } else {
         await register(
-            formData.email,
-            formData.username,
-            formData.password,
-            formData.learningLanguage
+          formData.email,
+          formData.username,
+          formData.password,
+          formData.learningLanguage
         );
         toast.success('Аккаунт успешно создан!');
-        }
-        router.push('/dashboard');
+      }
+      router.push('/dashboard');
     } catch (error) {
-        console.error('Auth error:', error);
-        toast.error(error instanceof Error ? error.message : 'Произошла ошибка');
+      console.error('Auth error:', error);
+      toast.error(error instanceof Error ? 
+        error.message : 
+        'Произошла ошибка при авторизации'
+      );
     }
-    };
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({
@@ -61,200 +66,235 @@ export default function AuthPage() {
     });
   };
 
+  // Показываем загрузку если еще не инициализировано
+  if (!isInitialized) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600">Инициализация...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Показываем страницу авторизации только если не авторизован
+  if (isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600">Перенаправление...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50 flex items-center justify-center p-4">
-      {/* Фоновые элементы */}
-      <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute -top-1/2 -right-1/2 w-96 h-96 bg-blue-100 rounded-full opacity-50 blur-3xl" />
-        <div className="absolute -bottom-1/2 -left-1/2 w-96 h-96 bg-purple-100 rounded-full opacity-50 blur-3xl" />
-      </div>
+      <div className="max-w-md w-full space-y-8">
+        {/* Логотип и заголовок */}
+        <div className="text-center">
+          <motion.div
+            initial={{ scale: 0, rotate: -180 }}
+            animate={{ scale: 1, rotate: 0 }}
+            transition={{ type: "spring", stiffness: 200, damping: 15 }}
+            className="mx-auto w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mb-4"
+          >
+            <span className="text-white text-2xl font-bold">📚</span>
+          </motion.div>
+          
+          <motion.h2
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-3xl font-bold text-gray-900"
+          >
+            Language Learning App
+          </motion.h2>
+          
+          <motion.p
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+            className="mt-2 text-gray-600"
+          >
+            {isLogin 
+              ? 'Войдите в свой аккаунт для продолжения изучения'
+              : 'Создайте аккаунт и начните изучать новые слова'
+            }
+          </motion.p>
+        </div>
 
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="relative z-10 w-full max-w-md"
-      >
-        <Card className="shadow-2xl border-0 bg-white/80 backdrop-blur-sm">
-          <CardContent className="p-8">
-            {/* Логотип и заголовок */}
-            <div className="text-center mb-8">
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                transition={{ delay: 0.2, type: "spring", stiffness: 200 }}
-                className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl mx-auto mb-4 flex items-center justify-center"
-              >
-                <span className="text-2xl text-white font-bold">📚</span>
-              </motion.div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Language Learning
-              </h1>
-              <p className="text-gray-600">
-                Изучайте языки с системой интервального повторения
-              </p>
-            </div>
-
-            {/* Переключатель вход/регистрация */}
-            <div className="flex bg-gray-100 rounded-lg p-1 mb-8">
-              <button
-                type="button"
-                onClick={() => setIsLogin(true)}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  isLogin
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Вход
-              </button>
-              <button
-                type="button"
-                onClick={() => setIsLogin(false)}
-                className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
-                  !isLogin
-                    ? 'bg-white text-blue-600 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Регистрация
-              </button>
-            </div>
-
-            {/* Форма */}
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={isLogin ? 'login' : 'register'}
-                  initial={{ opacity: 0, x: isLogin ? -20 : 20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: isLogin ? 20 : -20 }}
-                  transition={{ duration: 0.3 }}
-                  className="space-y-4"
-                >
-                  <Input
-                    name="email"
-                    type="email"
-                    label="Email"
-                    placeholder="your@email.com"
-                    value={formData.email}
-                    onChange={handleInputChange}
-                    required
-                  />
-
-                  {!isLogin && (
-                    <Input
-                      name="username"
-                      type="text"
-                      label="Имя пользователя"
-                      placeholder="username"
-                      value={formData.username}
-                      onChange={handleInputChange}
-                      required
-                    />
-                  )}
-
-                  <Input
-                    name="password"
-                    type="password"
-                    label="Пароль"
-                    placeholder="Минимум 6 символов"
-                    value={formData.password}
-                    onChange={handleInputChange}
-                    required
-                  />
-
-                  {!isLogin && (
-                    <div className="space-y-1">
-                      <label className="block text-sm font-medium text-gray-700">
-                        Язык изучения
-                      </label>
-                      <select
-                        name="learningLanguage"
-                        value={formData.learningLanguage}
-                        onChange={handleInputChange}
-                        className="block w-full rounded-lg border border-gray-300 px-3 py-2 text-gray-900 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        required
-                      >
-                        {Object.entries(LANGUAGES).map(([value, label]) => (
-                          <option key={value} value={value}>
-                            {label}
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
-                </motion.div>
-              </AnimatePresence>
-
-              <Button
-                type="submit"
-                loading={isLoading}
-                className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white py-3"
-                size="lg"
-              >
-                {isLogin ? 'Войти' : 'Создать аккаунт'}
-              </Button>
-            </form>
-
-            {/* Демо данные */}
-            <div className="mt-8 p-4 bg-blue-50 rounded-lg border border-blue-200">
-              <h4 className="text-sm font-medium text-blue-900 mb-2">
-                🧪 Демо данные для тестирования:
-              </h4>
-              <div className="text-sm text-blue-700 space-y-1">
-                <p><strong>Email:</strong> test@example.com</p>
-                <p><strong>Пароль:</strong> 123456</p>
+        {/* Форма */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+        >
+          <Card className="shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+            <CardContent className="p-6">
+              {/* Переключатель режима */}
+              <div className="flex rounded-lg bg-gray-100 p-1 mb-6">
                 <button
                   type="button"
-                  onClick={() => {
-                    setFormData({
-                      ...formData,
-                      email: 'test@example.com',
-                      password: '123456'
-                    });
-                    setIsLogin(true);
-                  }}
-                  className="text-blue-600 hover:text-blue-800 underline text-sm"
+                  onClick={() => setIsLogin(true)}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                    isLogin
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
                 >
-                  Заполнить автоматически
+                  Вход
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsLogin(false)}
+                  className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-all ${
+                    !isLogin
+                      ? 'bg-white text-gray-900 shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700'
+                  }`}
+                >
+                  Регистрация
                 </button>
               </div>
-            </div>
 
-            {/* Дополнительная информация */}
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-500">
-                {isLogin ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}
-                <button
-                  type="button"
-                  onClick={() => setIsLogin(!isLogin)}
-                  className="ml-1 text-blue-600 hover:text-blue-800 font-medium"
+              {/* Форма авторизации */}
+              <form onSubmit={handleSubmit} className="space-y-4">
+                <AnimatePresence mode="wait">
+                  {isLogin ? (
+                    <motion.div
+                      key="login"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      className="space-y-4"
+                    >
+                      <Input
+                        label="Email или имя пользователя"
+                        type="text"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Введите email или имя пользователя"
+                        autoFocus
+                      />
+                      <Input
+                        label="Пароль"
+                        type="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Введите пароль"
+                      />
+                    </motion.div>
+                  ) : (
+                    <motion.div
+                      key="register"
+                      initial={{ opacity: 0, x: 10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -10 }}
+                      className="space-y-4"
+                    >
+                      <Input
+                        label="Email"
+                        type="email"
+                        name="email"
+                        value={formData.email}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Введите ваш email"
+                        autoFocus
+                      />
+                      <Input
+                        label="Имя пользователя"
+                        type="text"
+                        name="username"
+                        value={formData.username}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Выберите имя пользователя"
+                      />
+                      <Input
+                        label="Пароль"
+                        type="password"
+                        name="password"
+                        value={formData.password}
+                        onChange={handleInputChange}
+                        required
+                        placeholder="Создайте пароль"
+                      />
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Изучаемый язык
+                        </label>
+                        <select
+                          name="learningLanguage"
+                          value={formData.learningLanguage}
+                          onChange={handleInputChange}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        >
+                          {LANGUAGES.map((lang) => (
+                            <option key={lang.code} value={lang.name}>
+                              {lang.flag} {lang.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+
+                <Button
+                  type="submit"
+                  isLoading={isLoading}
+                  className="w-full mt-6"
+                  size="lg"
                 >
-                  {isLogin ? 'Создать аккаунт' : 'Войти'}
-                </button>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+                  {isLogin ? 'Войти' : 'Создать аккаунт'}
+                </Button>
+              </form>
 
-        {/* Информация о проекте */}
+              {/* Дополнительная информация */}
+              {!isLogin && (
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.5 }}
+                  className="mt-4 p-3 bg-blue-50 rounded-lg"
+                >
+                  <p className="text-sm text-blue-700">
+                    💡 <strong>Совет:</strong> Выберите язык, который хотите изучать. 
+                    Вы сможете изменить его позже в настройках.
+                  </p>
+                </motion.div>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
+
+        {/* Дополнительная информация */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          transition={{ delay: 0.7 }}
-          className="mt-8 text-center"
+          transition={{ delay: 0.6 }}
+          className="text-center"
         >
-          <p className="text-sm text-gray-500 mb-4">
-            Создано командой из 3 друзей для изучения языков 🚀
+          <p className="text-sm text-gray-500">
+            {isLogin ? 'Нет аккаунта?' : 'Уже есть аккаунт?'}{' '}
+            <button
+              type="button"
+              onClick={() => setIsLogin(!isLogin)}
+              className="font-medium text-blue-600 hover:text-blue-500 transition-colors"
+            >
+              {isLogin ? 'Зарегистрируйтесь' : 'Войдите'}
+            </button>
           </p>
-          <div className="flex justify-center space-x-4 text-2xl">
-            <span title="Английский">🇺🇸</span>
-            <span title="Корейский">🇰🇷</span>
-            <span title="Китайский">🇨🇳</span>
-          </div>
         </motion.div>
-      </motion.div>
+      </div>
     </div>
   );
 }

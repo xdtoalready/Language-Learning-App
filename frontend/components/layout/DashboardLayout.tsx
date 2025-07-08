@@ -15,7 +15,7 @@ import {
   ArrowRightOnRectangleIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
-import { useAuth } from '@/store/useStore';
+import { useAuth, useStore } from '@/store/useStore';
 import { Button } from '@/components/ui/Button';
 
 interface DashboardLayoutProps {
@@ -34,25 +34,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const router = useRouter();
   const pathname = usePathname();
   const [isInitializing, setIsInitializing] = useState(true);
+  const [hasInitialized, setHasInitialized] = useState(false);
 
   useEffect(() => {
+    // Предотвращаем множественные инициализации
+    if (hasInitialized) {
+      console.log('🛑 DashboardLayout: Инициализация уже выполнена, пропускаем');
+      setIsInitializing(false);
+      return;
+    }
+
     const initialize = async () => {
       console.log('🔄 DashboardLayout: Инициализация...');
       
       try {
-        // Инициализируем аутентификацию
+        // Инициализируем аутентификацию только один раз
         initializeAuth();
+        setHasInitialized(true);
         
         // Даем небольшое время на проверку токена и загрузку профиля
-        await new Promise(resolve => setTimeout(resolve, 100));
+        await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Проверяем результат инициализации
-        const currentAuth = useAuth.getState().isAuthenticated;
-        const currentUser = useAuth.getState().user;
+        // ИСПРАВЛЕНО: используем useStore.getState() вместо useAuth.getState()
+        const currentAuth = useStore.getState().isAuthenticated;
+        const currentUser = useStore.getState().user;
         
         console.log('📊 Результат инициализации:', { 
           isAuthenticated: currentAuth,
-          hasUser: !!currentUser
+          hasUser: !!currentUser,
+          userEmail: currentUser?.email
         });
         
         if (!currentAuth) {
@@ -66,7 +76,8 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
           console.log('⏳ Ожидаем загрузку профиля пользователя...');
           await new Promise(resolve => setTimeout(resolve, 1000));
           
-          const finalUser = useAuth.getState().user;
+          // ИСПРАВЛЕНО: используем useStore.getState() вместо useAuth.getState()
+          const finalUser = useStore.getState().user;
           if (!finalUser) {
             console.log('❌ Не удалось загрузить профиль, редирект на /auth');
             logout();
@@ -85,7 +96,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     };
 
     initialize();
-  }, [initializeAuth, logout, router]);
+  }, [initializeAuth, logout, router, hasInitialized]);
 
   const handleLogout = () => {
     logout();
@@ -167,50 +178,49 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         </nav>
 
         {/* Профиль пользователя */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200">
-          <div className="flex items-center">
-            <div className="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center">
-              <UserIcon className="h-5 w-5 text-white" />
+        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
+          <div className="flex items-center space-x-3 mb-3">
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
+              <span className="text-white text-sm font-medium">
+                {user.username?.[0]?.toUpperCase() || '?'}
+              </span>
             </div>
-            <div className="ml-3 flex-1 min-w-0">
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900 truncate">
                 {user.username}
               </p>
               <p className="text-xs text-gray-500 truncate">
-                {user.learningLanguage}
+                {user.email}
               </p>
             </div>
-            <button
+          </div>
+          
+          <div className="flex space-x-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="flex-1"
+              onClick={() => router.push('/profile')}
+            >
+              <UserIcon className="h-4 w-4 mr-1" />
+              Профиль
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={handleLogout}
-              className="ml-2 p-1 text-gray-400 hover:text-gray-600 transition-colors"
-              title="Выйти"
+              className="text-red-600 hover:text-red-700 hover:bg-red-50"
             >
               <ArrowRightOnRectangleIcon className="h-4 w-4" />
-            </button>
-          </div>
-
-          {/* Стрик */}
-          <div className="mt-3 p-2 bg-gradient-to-r from-orange-100 to-red-100 rounded-lg">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-gray-700">Стрик</span>
-              <span className="text-sm font-bold text-orange-600">
-                🔥 {user.currentStreak} дн.
-              </span>
-            </div>
+            </Button>
           </div>
         </div>
       </div>
 
       {/* Основной контент */}
-      <div className="pl-64">
-        <main className="flex-1 p-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            {children}
-          </motion.div>
+      <div className="ml-64">
+        <main className="py-8 px-8">
+          {children}
         </main>
       </div>
     </div>
