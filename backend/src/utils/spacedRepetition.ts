@@ -95,17 +95,12 @@ export function updateWordProgress(currentMasteryLevel: number, rating: number):
  * @returns true, если слово нужно повторить
  */
 export function isWordDueForReview(
-  word: { nextReviewDate: Date | null; masteryLevel: number },
+  word: { nextReviewDate: Date; masteryLevel: number },
   currentDate: Date = new Date()
 ): boolean {
   // Исключаем выученные слова (mastery_level = 5)
   if (word.masteryLevel >= 5) {
     return false;
-  }
-
-    // Если nextReviewDate не установлена (null/undefined), считаем что слово готово к повторению
-  if (!word.nextReviewDate) {
-    return true;
   }
   
   // Сравниваем только даты (без времени)
@@ -128,8 +123,10 @@ export function createNewWordParams(): {
   currentInterval: number;
   nextReviewDate: Date;
 } {
+  // Новые слова должны быть доступны для изучения СРАЗУ
+  // Устанавливаем nextReviewDate на вчера, чтобы слово было готово к повторению
   const nextReviewDate = new Date();
-  nextReviewDate.setDate(nextReviewDate.getDate() + 1); // завтра
+  nextReviewDate.setDate(nextReviewDate.getDate() - 1); // вчера
   
   return {
     masteryLevel: 0,
