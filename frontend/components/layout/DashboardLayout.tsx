@@ -1,7 +1,7 @@
 // components/layout/DashboardLayout.tsx
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
@@ -30,25 +30,62 @@ const navigation = [
 ];
 
 export default function DashboardLayout({ children }: DashboardLayoutProps) {
-  const { user, isAuthenticated, logout, loadProfile } = useAuth();
+  const { user, isAuthenticated, logout, initializeAuth } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
+  const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth');
-      return;
-    }
-
-    // Загружаем профиль при первом заходе
-    if (!user) {
-      loadProfile().catch(() => {
-        toast.error('Ошибка загрузки профиля');
-        logout();
+    const initialize = async () => {
+      console.log('🔄 DashboardLayout: Инициализация...');
+      
+      try {
+        // Инициализируем аутентификацию
+        initializeAuth();
+        
+        // Даем небольшое время на проверку токена и загрузку профиля
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        // Проверяем результат инициализации
+        const currentAuth = useAuth.getState().isAuthenticated;
+        const currentUser = useAuth.getState().user;
+        
+        console.log('📊 Результат инициализации:', { 
+          isAuthenticated: currentAuth,
+          hasUser: !!currentUser
+        });
+        
+        if (!currentAuth) {
+          console.log('❌ Пользователь не авторизован, редирект на /auth');
+          router.push('/auth');
+          return;
+        }
+        
+        // Если авторизован, но нет пользователя - даем время на загрузку
+        if (currentAuth && !currentUser) {
+          console.log('⏳ Ожидаем загрузку профиля пользователя...');
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          const finalUser = useAuth.getState().user;
+          if (!finalUser) {
+            console.log('❌ Не удалось загрузить профиль, редирект на /auth');
+            logout();
+            router.push('/auth');
+            return;
+          }
+        }
+        
+        console.log('✅ Инициализация завершена успешно');
+      } catch (error) {
+        console.error('💥 Ошибка инициализации DashboardLayout:', error);
         router.push('/auth');
-      });
-    }
-  }, [isAuthenticated, user, loadProfile, logout, router]);
+      } finally {
+        setIsInitializing(false);
+      }
+    };
+
+    initialize();
+  }, [initializeAuth, logout, router]);
 
   const handleLogout = () => {
     logout();
@@ -56,10 +93,32 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     router.push('/auth');
   };
 
+  // Показываем загрузку во время инициализации
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="relative">
+            <div className="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent mx-auto"></div>
+            <div className="absolute inset-0 rounded-full border-4 border-blue-200 animate-ping opacity-20"></div>
+          </div>
+          <div className="space-y-2">
+            <h2 className="text-xl font-semibold text-gray-800">Language Learning App</h2>
+            <p className="text-gray-600">Проверка аутентификации...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Показываем загрузку если нет пользователя
   if (!isAuthenticated || !user) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600">Загрузка профиля...</p>
+        </div>
       </div>
     );
   }
