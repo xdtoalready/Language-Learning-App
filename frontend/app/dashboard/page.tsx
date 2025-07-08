@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 'use client';
 
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   PlayIcon,
@@ -26,43 +26,48 @@ export default function DashboardPage() {
   const { userStats, loadUserStats } = useStats();
   const { startReviewSession } = useReview();
   const router = useRouter();
+  const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
 
-  // Мемоизированная функция загрузки данных
+  // Мемоизированная функция загрузки данных - ОДИН РАЗ
   const loadDashboardData = useCallback(() => {
-    console.log('📊 DashboardPage: Проверяем, что нужно загрузить...');
-    
-    // Загружаем данные только если они еще не загружены и не загружаются
-    const promises = [];
-    
-    if (!wordsStats) {
-      console.log('📊 Загружаем статистику слов...');
-      promises.push(loadWordsStats().catch(console.error));
-    }
-    
-    if (dueWords.length === 0) {
-      console.log('📅 Загружаем слова к повторению...');
-      promises.push(loadDueWords().catch(console.error));
-    }
-    
-    if (!userStats) {
-      console.log('👤 Загружаем статистику пользователя...');
-      promises.push(loadUserStats().catch(console.error));
-    }
+    if (!hasLoadedInitially) {
+      console.log('📊 DashboardPage: Первичная загрузка данных...');
+      
+      // Загружаем данные только если они еще не загружены и не загружаются
+      const promises = [];
+      
+      if (!wordsStats) {
+        console.log('📊 Загружаем статистику слов...');
+        promises.push(loadWordsStats().catch(console.error));
+      }
+      
+      if (dueWords.length === 0) {
+        console.log('📅 Загружаем слова к повторению...');
+        promises.push(loadDueWords().catch(console.error));
+      }
+      
+      if (!userStats) {
+        console.log('👤 Загружаем статистику пользователя...');
+        promises.push(loadUserStats().catch(console.error));
+      }
 
-    // Выполняем все загрузки параллельно, если есть что загружать
-    if (promises.length > 0) {
-      console.log(`🚀 Запускаем ${promises.length} загрузок...`);
-      Promise.allSettled(promises).then(() => {
-        console.log('✅ DashboardPage: Все загрузки завершены');
-      });
-    } else {
-      console.log('✅ DashboardPage: Все данные уже загружены');
+      // Выполняем все загрузки параллельно, если есть что загружать
+      if (promises.length > 0) {
+        console.log(`🚀 Запускаем ${promises.length} загрузок...`);
+        Promise.allSettled(promises).then(() => {
+          console.log('✅ DashboardPage: Все загрузки завершены');
+        });
+      } else {
+        console.log('✅ DashboardPage: Все данные уже загружены');
+      }
+
+      setHasLoadedInitially(true);
     }
-  }, [wordsStats, dueWords.length, userStats, loadWordsStats, loadDueWords, loadUserStats]);
+  }, [hasLoadedInitially, wordsStats, dueWords.length, userStats, loadWordsStats, loadDueWords, loadUserStats]);
 
   useEffect(() => {
     loadDashboardData();
-  }, [loadDashboardData]);
+  }, []); // 🔥 Пустой массив - загружаем только при монтировании!
 
   const handleStartReview = async () => {
     try {

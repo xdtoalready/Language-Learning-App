@@ -46,25 +46,25 @@ import { toast } from 'react-hot-toast';
 export default function StatsPage() {
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [newGoal, setNewGoal] = useState('');
+  const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
   
   const { userStats, isLoadingStats, loadUserStats, updateDailyGoal } = useStats();
   const { user } = useAuth();
 
-  // Мемоизированная функция загрузки статистики
+  // Мемоизированная функция загрузки статистики - ОДИН РАЗ
   const loadStatsOnce = useCallback(() => {
-    if (!userStats && !isLoadingStats) {
-      console.log('📈 StatsPage: Загружаем статистику...');
+    if (!hasLoadedInitially && !userStats && !isLoadingStats) {
+      console.log('📈 StatsPage: Первичная загрузка статистики...');
       loadUserStats().catch(console.error);
-    } else if (userStats) {
-      console.log('✅ StatsPage: Статистика уже загружена');
-    } else if (isLoadingStats) {
-      console.log('⏳ StatsPage: Статистика уже загружается');
+      setHasLoadedInitially(true);
+    } else if (hasLoadedInitially) {
+      console.log('✅ StatsPage: Статистика уже загружена или загружается');
     }
-  }, [userStats, isLoadingStats, loadUserStats]);
+  }, [hasLoadedInitially, userStats, isLoadingStats, loadUserStats]);
 
   useEffect(() => {
     loadStatsOnce();
-  }, [loadStatsOnce]);
+  }, []); // 🔥 Пустой массив - загружаем только при монтировании!
 
   const handleUpdateGoal = async () => {
     const goal = parseInt(newGoal);

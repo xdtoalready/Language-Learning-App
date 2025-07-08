@@ -60,7 +60,7 @@ export default function ReviewPage() {
         router.push('/dashboard');
       });
     }
-  }, [isAuthenticated, isReviewSession, currentReviewWord, startReviewSession, router]);
+  }, []); // 🔥 Пустой массив - инициализируем только один раз при монтировании!
 
   const handleSubmitRating = async (rating: number) => {
     if (!currentReviewWord) return;
