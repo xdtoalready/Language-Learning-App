@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { updateUserActivity } from './friendshipController';
 import { updateWordAfterReview } from '../utils/spacedRepetition';
 
 const prisma = new PrismaClient();
@@ -83,6 +84,8 @@ export const submitReview = async (req: AuthRequest, res: Response): Promise<voi
           totalWordsLearned: true
         }
       });
+
+      await updateUserActivity(userId);
 
       let updateData: any = {};
       const today = new Date();

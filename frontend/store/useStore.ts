@@ -54,7 +54,19 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   initializeAuth: () => Promise<void>;
   updateProfile: (updates: { username?: string; learningLanguage?: string; dailyGoal?: number; avatar?: string; }) => Promise<void>;
   
-  
+  // Friendship state
+  friends: any[];
+  pendingRequests: any[];
+  isLoadingFriends: boolean;
+
+  // Friendship actions
+  loadFriends: () => Promise<void>;
+  loadPendingRequests: () => Promise<void>;
+  searchUsers: (query: string) => Promise<any[]>;
+  sendFriendRequest: (friendId: string) => Promise<void>;
+  respondToFriendRequest: (friendshipId: string, action: 'accept' | 'reject') => Promise<void>;
+  removeFriend: (friendshipId: string) => Promise<void>;
+
   // Words actions
   loadWords: (params?: any) => Promise<void>;
   loadDueWords: () => Promise<void>;
@@ -123,8 +135,11 @@ export const useStore = create<AppStore>((set, get) => ({
   currentReviewWord: null,
   hasMoreWords: false,
   remainingWords: 0,
+  friends: [],
+  pendingRequests: [],
+  isLoadingFriends: false,
 
-  // 🔥 УПРОЩЕННАЯ инициализация аутентификации
+  // Инициализация аутентификации
   initializeAuth: async () => {
     const state = get();
     
@@ -481,6 +496,86 @@ export const useStore = create<AppStore>((set, get) => ({
         break;
     }
   },
+
+  // ============== FRIENDSHIP ACTIONS ==============
+  
+  loadFriends: async () => {
+    const state = get();
+    if (state.isLoadingFriends) return;
+    
+    set({ isLoadingFriends: true });
+    try {
+      const response = await apiClient.getFriendsWithClouds();
+      set({ friends: response.friends });
+    } catch (error) {
+      console.error('❌ Ошибка загрузки друзей:', error);
+    } finally {
+      set({ isLoadingFriends: false });
+    }
+  },
+
+  loadPendingRequests: async () => {
+    try {
+      const response = await apiClient.getPendingRequests();
+      set({ pendingRequests: response.requests });
+    } catch (error) {
+      console.error('❌ Ошибка загрузки заявок:', error);
+    }
+  },
+
+  searchUsers: async (query: string) => {
+    try {
+      const response = await apiClient.searchUsers(query);
+      return response.users;
+    } catch (error) {
+      console.error('❌ Ошибка поиска пользователей:', error);
+      return [];
+    }
+  },
+
+  sendFriendRequest: async (friendId: string) => {
+    try {
+      await apiClient.sendFriendRequest(friendId);
+    } catch (error) {
+      console.error('❌ Ошибка отправки заявки:', error);
+      throw error;
+    }
+  },
+
+  respondToFriendRequest: async (friendshipId: string, action: 'accept' | 'reject') => {
+    try {
+      await apiClient.respondToFriendRequest(friendshipId, action);
+      // Обновляем списки
+      get().loadPendingRequests();
+      get().loadFriends();
+    } catch (error) {
+      console.error('❌ Ошибка ответа на заявку:', error);
+      throw error;
+    }
+  },
+
+  removeFriend: async (friendshipId: string) => {
+    try {
+      await apiClient.removeFriend(friendshipId);
+      // Обновляем список друзей
+      get().loadFriends();
+    } catch (error) {
+      console.error('❌ Ошибка удаления друга:', error);
+      throw error;
+    }
+  },
+}));
+
+export const useFriends = () => useStore((state) => ({
+  friends: state.friends,
+  pendingRequests: state.pendingRequests,
+  isLoadingFriends: state.isLoadingFriends,
+  loadFriends: state.loadFriends,
+  loadPendingRequests: state.loadPendingRequests,
+  searchUsers: state.searchUsers,
+  sendFriendRequest: state.sendFriendRequest,
+  respondToFriendRequest: state.respondToFriendRequest,
+  removeFriend: state.removeFriend
 }));
 
 // Хуки для удобного доступа к частям стора

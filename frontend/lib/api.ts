@@ -283,6 +283,44 @@ if (contentType && contentType.includes('application/json')) {
     return this.request<{ difficultWords: Word[] }>(`/stats/difficult-words${query}`);
   }
 
+  // ============== FRIENDSHIP METHODS ==============
+  
+  async searchUsers(query: string): Promise<{ users: any[] }> {
+    return this.request<{ users: any[] }>(`/friendships/search?query=${encodeURIComponent(query)}`);
+  }
+
+  async sendFriendRequest(friendId: string): Promise<{ message: string; friendship: any }> {
+    return this.request<{ message: string; friendship: any }>('/friendships/request', {
+      method: 'POST',
+      body: JSON.stringify({ friendId }),
+    });
+  }
+
+  async respondToFriendRequest(friendshipId: string, action: 'accept' | 'reject'): Promise<{ message: string; friendship?: any }> {
+    return this.request<{ message: string; friendship?: any }>(`/friendships/request/${friendshipId}`, {
+      method: 'PUT',
+      body: JSON.stringify({ action }),
+    });
+  }
+
+  async getFriends(): Promise<{ friends: any[] }> {
+    return this.request<{ friends: any[] }>('/friendships');
+  }
+
+  async getFriendsWithClouds(): Promise<{ friends: any[] }> {
+    return this.request<{ friends: any[] }>('/friendships/clouds');
+  }
+
+  async getPendingRequests(): Promise<{ requests: any[] }> {
+    return this.request<{ requests: any[] }>('/friendships/requests');
+  }
+
+  async removeFriend(friendshipId: string): Promise<{ message: string }> {
+    return this.request<{ message: string }>(`/friendships/${friendshipId}`, {
+      method: 'DELETE',
+    });
+  }
+
   // Проверка здоровья API
   async healthCheck(): Promise<{ status: string; timestamp: string; service: string }> {
     return this.request<{ status: string; timestamp: string; service: string }>('/health');

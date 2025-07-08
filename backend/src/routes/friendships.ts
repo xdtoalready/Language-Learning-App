@@ -26,5 +26,6 @@ router.get('/requests', getPendingRequests);
 // Управление друзьями
 router.get('/', getFriends);
 router.delete('/:friendshipId', removeFriend);
+router.get('/clouds', getFriendsWithClouds);
 
 export default router;

@@ -4,6 +4,156 @@ import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
+/**
+ * Обновить активность пользователя для всех его друзей
+ */
+export const updateUserActivity = async (userId: string): Promise<void> => {
+  try {
+    console.log(`🔄 Обновляем активность пользователя ${userId}`);
+    
+    // Получаем все дружеские связи пользователя
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        OR: [
+          { userId, status: 'ACCEPTED' },
+          { friendId: userId, status: 'ACCEPTED' }
+        ]
+      },
+      include: {
+        cloudStreak: true
+      }
+    });
+
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Начало дня
+
+    for (const friendship of friendships) {
+      const isUser1 = friendship.userId === userId;
+      
+      // Получаем или создаем CloudStreak
+      let cloudStreak = friendship.cloudStreak;
+      if (!cloudStreak) {
+        cloudStreak = await prisma.cloudStreak.create({
+          data: {
+            friendshipId: friendship.id,
+            currentStreak: 0,
+            longestStreak: 0
+          }
+        });
+      }
+
+      // Обновляем активность соответствующего пользователя
+      const updateData: any = {};
+      if (isUser1) {
+        updateData.user1LastActive = new Date();
+      } else {
+        updateData.user2LastActive = new Date();
+      }
+
+      // Проверяем, активны ли оба пользователя сегодня
+      const otherUserActiveToday = isUser1 
+        ? cloudStreak.user2LastActive && cloudStreak.user2LastActive >= today
+        : cloudStreak.user1LastActive && cloudStreak.user1LastActive >= today;
+
+      const currentUserActiveToday = true; // Текущий пользователь активен (мы его обновляем)
+
+      // Если оба активны сегодня, обновляем стрик
+      if (otherUserActiveToday && currentUserActiveToday) {
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
+
+        // Проверяем, был ли вчера активен стрик
+        const wasActiveYesterday = cloudStreak.lastActiveDate && 
+          cloudStreak.lastActiveDate >= yesterday && 
+          cloudStreak.lastActiveDate < today;
+
+        if (wasActiveYesterday) {
+          // Продолжаем стрик
+          updateData.currentStreak = cloudStreak.currentStreak + 1;
+        } else {
+          // Начинаем новый стрик
+          updateData.currentStreak = 1;
+        }
+
+        updateData.lastActiveDate = today;
+        updateData.longestStreak = Math.max(cloudStreak.longestStreak, updateData.currentStreak);
+      }
+
+      // Обновляем CloudStreak
+      await prisma.cloudStreak.update({
+        where: { id: cloudStreak.id },
+        data: updateData
+      });
+    }
+  } catch (error) {
+    console.error('❌ Ошибка обновления активности:', error);
+  }
+};
+
+/**
+ * Получить облачки друзей
+ */
+export const getFriendsWithClouds = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+
+    const friendships = await prisma.friendship.findMany({
+      where: {
+        OR: [
+          { userId, status: 'ACCEPTED' },
+          { friendId: userId, status: 'ACCEPTED' }
+        ]
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+            learningLanguage: true,
+            currentStreak: true,
+            totalWordsLearned: true,
+            lastActiveDate: true
+          }
+        },
+        friend: {
+          select: {
+            id: true,
+            username: true,
+            avatar: true,
+            learningLanguage: true,
+            currentStreak: true,
+            totalWordsLearned: true,
+            lastActiveDate: true
+          }
+        },
+        cloudStreak: true
+      }
+    });
+
+    // Формируем список друзей с облачками
+    const friendsWithClouds = friendships.map(friendship => {
+      const friend = friendship.userId === userId ? friendship.friend : friendship.user;
+      const cloudStreak = friendship.cloudStreak?.currentStreak || 0;
+      
+      return {
+        ...friend,
+        friendshipId: friendship.id,
+        friendshipDate: friendship.createdAt,
+        cloudStreak,
+        longestCloudStreak: friendship.cloudStreak?.longestStreak || 0,
+        lastCloudActivity: friendship.cloudStreak?.lastActiveDate
+      };
+    });
+
+    res.json({ friends: friendsWithClouds });
+
+  } catch (error) {
+    console.error('Get friends with clouds error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
 interface AuthRequest extends Request {
   userId?: string;
 }
@@ -237,58 +387,8 @@ export const respondToFriendRequest = async (req: AuthRequest, res: Response): P
  * Получить список друзей
  */
 export const getFriends = async (req: AuthRequest, res: Response): Promise<void> => {
-  try {
-    const userId = req.userId!;
-
-    const friendships = await prisma.friendship.findMany({
-      where: {
-        OR: [
-          { userId, status: 'ACCEPTED' },
-          { friendId: userId, status: 'ACCEPTED' }
-        ]
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            username: true,
-            avatar: true,
-            learningLanguage: true,
-            currentStreak: true,
-            totalWordsLearned: true,
-            lastActiveDate: true
-          }
-        },
-        friend: {
-          select: {
-            id: true,
-            username: true,
-            avatar: true,
-            learningLanguage: true,
-            currentStreak: true,
-            totalWordsLearned: true,
-            lastActiveDate: true
-          }
-        }
-      }
-    });
-
-    // Формируем список друзей
-    const friends = friendships.map(friendship => {
-      const friend = friendship.userId === userId ? friendship.friend : friendship.user;
-      return {
-        ...friend,
-        friendshipId: friendship.id,
-        friendshipDate: friendship.createdAt
-      };
-    });
-
-    res.json({ friends });
-
-  } catch (error) {
-    console.error('Get friends error:', error);
-    res.status(500).json({ error: 'Internal server error' });
-  }
+  // Просто вызываем метод с облачками
+  await getFriendsWithClouds(req, res);
 };
 
 /**

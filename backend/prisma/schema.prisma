@@ -82,6 +82,8 @@ model Friendship {
   userId   String
   user     User   @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
   
+  cloudStreak  CloudStreak? // Связь с облачком (один к одному)
+  
   friendId String
   friend   User   @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
   
@@ -97,4 +99,27 @@ enum FriendshipStatus {
   PENDING
   ACCEPTED
   BLOCKED
+}
+
+model CloudStreak {
+  id           String   @id @default(cuid())
+  
+  // Связь с дружбой
+  friendshipId String
+  friendship   Friendship @relation(fields: [friendshipId], references: [id], onDelete: Cascade)
+  
+  // Статистика облачка
+  currentStreak Int      @default(0) // Текущий стрик облачка в днях
+  longestStreak Int      @default(0) // Самый длинный стрик
+  lastActiveDate DateTime? // Последний день когда оба были активны
+  
+  // Для отслеживания активности каждого друга по дням
+  user1LastActive DateTime? // Последняя активность первого пользователя
+  user2LastActive DateTime? // Последняя активность второго пользователя
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  
+  @@unique([friendshipId])
+  @@map("cloud_streaks")
 }
