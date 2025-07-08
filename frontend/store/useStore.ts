@@ -58,7 +58,7 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   setLoading: (type: 'auth' | 'words' | 'stats', value: boolean) => void;
 }
 
-export const useStore = create<AppStore>((set, get) => ({{
+export const useStore = create<AppStore>((set, get) => ({
       // Initial state
       user: null,
       isAuthenticated: false,
@@ -284,7 +284,7 @@ export const useStore = create<AppStore>((set, get) => ({{
         }
       }
     }
-  )
+  })
 );
 
 // Хуки для удобного доступа к частям стора
