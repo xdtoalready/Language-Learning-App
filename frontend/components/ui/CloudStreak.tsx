@@ -87,10 +87,10 @@ export const CloudStreak: React.FC<CloudStreakProps> = ({
   
   // Обновленные размеры с добавлением xs
   const sizes = {
-    xs: { width: 36, height: 28, fontSize: '10px' },
-    sm: { width: 80, height: 60, fontSize: '12px' },
-    md: { width: 120, height: 90, fontSize: '14px' },
-    lg: { width: 160, height: 120, fontSize: '16px' }
+    xs: { width: 28, height: 28, fontSize: '10px' },
+    sm: { width: 60, height: 60, fontSize: '12px' },
+    md: { width: 90, height: 90, fontSize: '14px' },
+    lg: { width: 120, height: 120, fontSize: '16px' }
   };
   
   const { width, height, fontSize } = sizes[size];
@@ -145,7 +145,7 @@ export const CloudStreak: React.FC<CloudStreakProps> = ({
           {/* Счетчик дней в центре облачка для всех размеров */}
           <text
             x="46"
-            y="45"
+            y="34"
             textAnchor="middle"
             dominantBaseline="central"
             fontSize={size === 'xs' ? '12' : '16'}
