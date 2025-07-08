@@ -281,11 +281,9 @@ export const useStore = create<AppStore>((set, get) => ({
           case 'stats':
             set({ isLoadingStats: value });
             break;
-        }
-      }
     }
-  })
-);
+  },
+}));
 
 // Хуки для удобного доступа к частям стора
 export const useAuth = () => useStore((state) => ({
