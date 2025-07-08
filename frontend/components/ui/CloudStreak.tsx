@@ -87,7 +87,7 @@ export const CloudStreak: React.FC<CloudStreakProps> = ({
   
   // Обновленные размеры с добавлением xs
   const sizes = {
-    xs: { width: 36, height: 28, fontSize: '10px' },  // Новый маленький размер
+    xs: { width: 36, height: 28, fontSize: '10px' },
     sm: { width: 80, height: 60, fontSize: '12px' },
     md: { width: 120, height: 90, fontSize: '14px' },
     lg: { width: 160, height: 120, fontSize: '16px' }
@@ -97,7 +97,7 @@ export const CloudStreak: React.FC<CloudStreakProps> = ({
 
   return (
     <div className={`relative flex flex-col items-center ${className}`}>
-      {/* Основное облачко */}
+      {/* Основное облачко с числом */}
       <motion.div
         className="relative"
         animate={config.pulseSpeed > 0 ? {
@@ -142,21 +142,19 @@ export const CloudStreak: React.FC<CloudStreakProps> = ({
             filter={`url(#glow-${config.type}-${size})`}
           />
 
-          {/* Счетчик дней в центре облачка (только для xs и больше) */}
-          {size !== 'xs' && (
-            <text
-              x="46"
-              y="45"
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize="16"
-              fontWeight="bold"
-              fill="white"
-              style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}
-            >
-              {days}
-            </text>
-          )}
+          {/* Счетчик дней в центре облачка для всех размеров */}
+          <text
+            x="46"
+            y="45"
+            textAnchor="middle"
+            dominantBaseline="central"
+            fontSize={size === 'xs' ? '12' : '16'}
+            fontWeight="bold"
+            fill="white"
+            style={{ textShadow: '1px 1px 2px rgba(0,0,0,0.3)' }}
+          >
+            {days}
+          </text>
         </svg>
       </motion.div>
 
@@ -178,13 +176,6 @@ export const CloudStreak: React.FC<CloudStreakProps> = ({
             {config.label}
           </div>
         </motion.div>
-      )}
-
-      {/* Для размера xs показываем только число рядом с облачком */}
-      {size === 'xs' && (
-        <span className="text-xs font-medium text-gray-600 ml-1">
-          {days}
-        </span>
       )}
     </div>
   );
