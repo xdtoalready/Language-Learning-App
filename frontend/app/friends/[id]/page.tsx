@@ -209,7 +209,7 @@ export default function FriendProfilePage() {
 
                 {/* Правая часть - статистика */}
                 <div className="flex-1 grid grid-cols-2 lg:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-orange-50 rounded-lg">
+                  <div className="text-center p-4 bg-orange-50 rounded-lg flex justify-center items-center flex-col">
                     <FireIcon className="h-8 w-8 text-orange-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900">
                       {friendProfile.currentStreak}
@@ -217,7 +217,7 @@ export default function FriendProfilePage() {
                     <div className="text-sm text-gray-600">Текущий стрик</div>
                   </div>
 
-                  <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <div className="text-center p-4 bg-blue-50 rounded-lg flex justify-center items-center flex-col">
                     <BookOpenIcon className="h-8 w-8 text-blue-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900">
                       {friendProfile.totalWordsLearned}
@@ -225,7 +225,7 @@ export default function FriendProfilePage() {
                     <div className="text-sm text-gray-600">Слов изучено</div>
                   </div>
 
-                  <div className="text-center p-4 bg-yellow-50 rounded-lg">
+                  <div className="text-center p-4 bg-yellow-50 rounded-lg flex justify-center items-center flex-col">
                     <StarIcon className="h-8 w-8 text-yellow-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900">
                       {friendProfile.longestStreak}
@@ -233,7 +233,7 @@ export default function FriendProfilePage() {
                     <div className="text-sm text-gray-600">Лучший стрик</div>
                   </div>
 
-                  <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <div className="text-center p-4 bg-green-50 rounded-lg flex justify-center items-center flex-col">
                     <CalendarIcon className="h-8 w-8 text-green-500 mx-auto mb-2" />
                     <div className="text-2xl font-bold text-gray-900">
                       {Math.ceil((Date.now() - new Date(friendProfile.joinDate).getTime()) / (1000 * 60 * 60 * 24))}
