@@ -1,4 +1,6 @@
 // components/ui/ProgressBar.tsx
+import { cn } from '@/lib/utils';
+
 interface ProgressBarProps {
   value: number;
   max?: number;

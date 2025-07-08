@@ -1,5 +1,6 @@
 // components/ui/LoadingSpinner.tsx
 import { ArrowPathIcon } from '@heroicons/react/24/outline';
+import { cn } from '@/lib/utils';
 
 interface LoadingSpinnerProps {
   size?: 'sm' | 'md' | 'lg';

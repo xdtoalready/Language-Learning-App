@@ -1,4 +1,6 @@
 // components/ui/Modal.tsx
+import { cn } from '@/lib/utils';
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;

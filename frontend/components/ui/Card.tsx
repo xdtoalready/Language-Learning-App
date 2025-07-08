@@ -1,4 +1,6 @@
 // components/ui/Card.tsx
+import { cn } from '@/lib/utils';
+
 interface CardProps {
   children: React.ReactNode;
   className?: string;

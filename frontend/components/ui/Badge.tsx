@@ -1,4 +1,6 @@
 // components/ui/Badge.tsx
+import { cn } from '@/lib/utils';
+
 interface BadgeProps {
   children: React.ReactNode;
   variant?: 'default' | 'secondary' | 'success' | 'warning' | 'danger';
