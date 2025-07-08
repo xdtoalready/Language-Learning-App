@@ -252,16 +252,20 @@ export const getReviewStats = async (req: AuthRequest, res: Response): Promise<v
 export const startReviewSession = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
     const userId = req.userId!;
-    
-    // Получаем случайное слово для повторения
     const words = await prisma.word.findMany({
       where: { 
         userId,
         masteryLevel: { lt: 5 },
-        nextReviewDate: { lte: new Date() }
+        OR: [
+          { nextReviewDate: { lte: new Date() } },
+          { nextReviewDate: null }
+        ]
       },
       take: 1,
-      orderBy: { nextReviewDate: 'asc' }
+      orderBy: [
+        { nextReviewDate: 'asc' },
+        { createdAt: 'asc' }
+      ]
     });
 
     if (words.length === 0) {
@@ -280,7 +284,10 @@ export const startReviewSession = async (req: AuthRequest, res: Response): Promi
       where: { 
         userId,
         masteryLevel: { lt: 5 },
-        nextReviewDate: { lte: new Date() },
+        OR: [
+          { nextReviewDate: { lte: new Date() } },
+          { nextReviewDate: null }
+        ],
         id: { not: word.id }
       }
     });
