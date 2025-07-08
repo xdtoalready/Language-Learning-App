@@ -24,6 +24,7 @@ import DashboardLayout from '@/components/layout/DashboardLayout';
 import { formatDate, getStreakEmoji, LANGUAGES } from '@/lib/utils';
 import { useFriends } from '@/store/useStore';
 import { apiClient } from '@/lib/api';
+import { FriendWordsTable } from '@/components/friends/FriendWordsTable';
 
 interface FriendProfile {
   id: string;
@@ -245,6 +246,20 @@ export default function FriendProfilePage() {
             </CardContent>
           </Card>
         </motion.div>
+
+        {/* НОВАЯ СЕКЦИЯ: Изучаемые слова */}
+        {friendProfile.isFriend && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
+          >
+            <FriendWordsTable 
+              friendId={friendProfile.id}
+              friendUsername={friendProfile.username}
+            />
+          </motion.div>
+        )}
 
         {/* Облачко мотивации */}
         {friendProfile.isFriend && (

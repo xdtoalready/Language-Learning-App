@@ -287,7 +287,45 @@ if (contentType && contentType.includes('application/json')) {
     return this.request<{ difficultWords: Word[] }>(`/stats/difficult-words${query}`);
   }
 
-  // ============== FRIENDSHIP METHODS ==============
+   // ===== МЕТОДЫ ДЛЯ СЛОВ ДРУЗЕЙ =====
+
+  /**
+   * Получить активные слова друга
+   */
+  async getFriendWords(
+    friendId: string, 
+    params?: {
+      search?: string;
+      tags?: string;
+      page?: number;
+      limit?: number;
+    }
+  ): Promise<FriendWordsResponse> {
+    const queryParams = new URLSearchParams();
+    
+    if (params?.search) queryParams.append('search', params.search);
+    if (params?.tags) queryParams.append('tags', params.tags);
+    if (params?.page) queryParams.append('page', params.page.toString());
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+
+    const query = queryParams.toString();
+    const endpoint = `/friends/${friendId}/words${query ? `?${query}` : ''}`;
+    
+    console.log('🔍 Загружаем слова друга:', { friendId, params });
+    return this.request<FriendWordsResponse>(endpoint);
+  }
+
+  /**
+   * Копировать слово друга к себе в словарь
+   */
+  async copyFriendWord(friendId: string, wordId: string): Promise<CopyWordResponse> {
+    console.log('📋 Копируем слово друга:', { friendId, wordId });
+    return this.request<CopyWordResponse>(`/friends/${friendId}/words/${wordId}/copy`, {
+      method: 'POST'
+    });
+  }
+
+  // ============== МЕТОДЫ ДРУЗЕЙ ==============
   
   async searchUsers(query: string): Promise<{ users: any[] }> {
     return this.request<{ users: any[] }>(`/friendships/search?query=${encodeURIComponent(query)}`);
@@ -329,6 +367,36 @@ if (contentType && contentType.includes('application/json')) {
   async healthCheck(): Promise<{ status: string; timestamp: string; service: string }> {
     return this.request<{ status: string; timestamp: string; service: string }>('/health');
   }
+}
+
+export interface FriendWordsResponse {
+  words: Array<{
+    id: string;
+    word: string;
+    translation: string;
+    transcription?: string;
+    tags: string[];
+    masteryLevel: number;
+    createdAt: string;
+  }>;
+  availableTags: string[];
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    limit: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  };
+}
+
+export interface CopyWordResponse {
+  message: string;
+  word: Word;
+  copiedFrom: {
+    username: string;
+    originalWord: string;
+  };
 }
 
 // Создаем единственный экземпляр API клиента

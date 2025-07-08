@@ -8,7 +8,9 @@ import {
   getPendingRequests,
   getFriendsWithClouds,
   removeFriend,
-  getFriendProfile
+  getFriendProfile,
+  getFriendWords,
+  copyFriendWord
 } from '../controllers/friendshipController';
 import { authenticateToken } from '../middleware/auth';
 
@@ -30,5 +32,7 @@ router.get('/', getFriends);
 router.delete('/:friendshipId', removeFriend);
 router.get('/clouds', getFriendsWithClouds);
 router.get('/:friendId/profile', getFriendProfile);
+router.get('/:friendId/words', authenticateToken, getFriendWords);
+router.post('/:friendId/words/:wordId/copy', authenticateToken, copyFriendWord);
 
 export default router;

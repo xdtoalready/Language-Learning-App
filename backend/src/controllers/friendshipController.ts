@@ -1,6 +1,7 @@
 // backend/src/controllers/friendshipController.ts
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { createNewWordParams } from '../utils/spacedRepetition';
 
 const prisma = new PrismaClient();
 
@@ -222,6 +223,223 @@ export const getFriendProfile = async (req: AuthRequest, res: Response): Promise
 
   } catch (error) {
     console.error('Get friend profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Получить активные слова друга для изучения
+ */
+export const getFriendWords = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { friendId } = req.params;
+    const { 
+      search, 
+      tags, 
+      page = '1',
+      limit = '20'
+    } = req.query;
+
+    if (!friendId) {
+      res.status(400).json({ error: 'Friend ID is required' });
+      return;
+    }
+
+    // Проверяем, что пользователи друзья
+    const friendship = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { userId, friendId, status: 'ACCEPTED' },
+          { userId: friendId, friendId: userId, status: 'ACCEPTED' }
+        ]
+      }
+    });
+
+    if (!friendship) {
+      res.status(403).json({ error: 'You are not friends with this user' });
+      return;
+    }
+
+    // Подготавливаем фильтры для слов
+    const where: any = { 
+      userId: friendId,
+      masteryLevel: { lt: 5 } // Только активные слова (не выученные)
+    };
+
+    // Поиск по слову или переводу
+    if (search) {
+      where.OR = [
+        { word: { contains: search as string, mode: 'insensitive' } },
+        { translation: { contains: search as string, mode: 'insensitive' } }
+      ];
+    }
+
+    // Фильтр по тегам
+    if (tags) {
+      const tagArray = (tags as string).split(',').filter(tag => tag.trim());
+      if (tagArray.length > 0) {
+        where.tags = {
+          hasSome: tagArray
+        };
+      }
+    }
+
+    // Пагинация
+    const pageNum = parseInt(page as string);
+    const limitNum = parseInt(limit as string);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Получаем слова и общее количество
+    const [words, totalCount] = await Promise.all([
+      prisma.word.findMany({
+        where,
+        select: {
+          id: true,
+          word: true,
+          translation: true,
+          transcription: true,
+          tags: true,
+          masteryLevel: true,
+          createdAt: true
+        },
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take: limitNum
+      }),
+      prisma.word.count({ where })
+    ]);
+
+    // Получаем уникальные теги для фильтрации
+    const allWords = await prisma.word.findMany({
+      where: { 
+        userId: friendId,
+        masteryLevel: { lt: 5 }
+      },
+      select: { tags: true }
+    });
+
+    const allTags = [...new Set(allWords.flatMap(w => w.tags))].sort();
+
+    const totalPages = Math.ceil(totalCount / limitNum);
+
+    res.json({
+      words,
+      availableTags: allTags,
+      pagination: {
+        currentPage: pageNum,
+        totalPages,
+        totalCount,
+        limit: limitNum,
+        hasNext: pageNum < totalPages,
+        hasPrev: pageNum > 1
+      }
+    });
+
+  } catch (error) {
+    console.error('Get friend words error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
+ * Копировать слово друга к себе в словарь
+ */
+export const copyFriendWord = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { friendId, wordId } = req.params;
+
+    if (!friendId || !wordId) {
+      res.status(400).json({ error: 'Friend ID and Word ID are required' });
+      return;
+    }
+
+    // Проверяем, что пользователи друзья
+    const friendship = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { userId, friendId, status: 'ACCEPTED' },
+          { userId: friendId, friendId: userId, status: 'ACCEPTED' }
+        ]
+      }
+    });
+
+    if (!friendship) {
+      res.status(403).json({ error: 'You are not friends with this user' });
+      return;
+    }
+
+    // Получаем слово друга
+    const friendWord = await prisma.word.findFirst({
+      where: {
+        id: wordId,
+        userId: friendId
+      }
+    });
+
+    if (!friendWord) {
+      res.status(404).json({ error: 'Word not found' });
+      return;
+    }
+
+    // Проверяем, что у текущего пользователя еще нет такого слова
+    const existingWord = await prisma.word.findFirst({
+      where: {
+        userId,
+        word: { equals: friendWord.word, mode: 'insensitive' }
+      }
+    });
+
+    if (existingWord) {
+      res.status(409).json({ 
+        error: 'Word already exists in your vocabulary',
+        existingWord: {
+          id: existingWord.id,
+          word: existingWord.word,
+          translation: existingWord.translation
+        }
+      });
+      return;
+    }
+
+    // Создаем параметры для нового слова (сбрасываем прогресс)
+    const newWordParams = createNewWordParams();
+
+    // Копируем слово к пользователю
+    const newWord = await prisma.word.create({
+      data: {
+        word: friendWord.word,
+        translation: friendWord.translation,
+        transcription: friendWord.transcription,
+        example: friendWord.example,
+        tags: [...friendWord.tags, 'от друга'], // Добавляем тег "от друга"
+        userId,
+        ...newWordParams
+      }
+    });
+
+    // Обновляем счетчик слов у пользователя
+    await prisma.user.update({
+      where: { id: userId },
+      data: {
+        totalWordsLearned: {
+          increment: 1
+        }
+      }
+    });
+
+    res.status(201).json({
+      message: 'Word copied successfully',
+      word: newWord,
+      copiedFrom: {
+        username: friendId, // В реальном проекте лучше получить username
+        originalWord: friendWord.word
+      }
+    });
+
+  } catch (error) {
+    console.error('Copy friend word error:', error);
     res.status(500).json({ error: 'Internal server error' });
   }
 };
