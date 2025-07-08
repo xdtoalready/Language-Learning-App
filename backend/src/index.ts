@@ -21,13 +21,18 @@ const app = express();
 const PORT = Number(process.env.PORT) || 5000;
 
 // Security middleware
-app.use(helmet());
+app.use(helmet({
+  crossOriginEmbedderPolicy: false,
+  contentSecurityPolicy: false
+}));
 
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
+  max: 1000, // Увеличиваем лимит для разработки
+  message: 'Too many requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 app.use(limiter);
 
@@ -36,11 +41,11 @@ app.use(cors({
   origin: [
     'http://localhost:3000',
     'http://127.0.0.1:3000',
-    'http://5.129.203.118:3000',  // Ваш внешний IP
-    /^http:\/\/.*:3000$/         // Любой IP на порту 3000
+    'http://5.129.203.118:3000',
+    /^http:\/\/.*:3000$/
   ],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Origin',
     'X-Requested-With',
@@ -48,24 +53,33 @@ app.use(cors({
     'Accept',
     'Authorization',
     'Cache-Control',
-    'Pragma'
+    'Pragma',
+    'X-HTTP-Method-Override'
   ],
   exposedHeaders: ['set-cookie'],
-  optionsSuccessStatus: 200
+  optionsSuccessStatus: 200,
+  preflightContinue: false
 }));
 
 // Дополнительная обработка OPTIONS запросов
-// app.use((req, res, next) => {
-//   if (req.method === 'OPTIONS') {
-//     res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
-//     res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
-//     res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
-//     res.header('Access-Control-Allow-Credentials', 'true');
-//     res.sendStatus(200);
-//   } else {
-//     next();
-//   }
-// });
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    const origin = req.headers.origin;
+    if (origin && (
+      origin.includes('localhost:3000') || 
+      origin.includes('127.0.0.1:3000') || 
+      origin.includes('5.129.203.118:3000')
+    )) {
+      res.header('Access-Control-Allow-Origin', origin);
+    }
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS,PATCH');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With, Accept, Origin, X-HTTP-Method-Override');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Access-Control-Max-Age', '86400'); // 24 часа кеширования preflight
+    return res.sendStatus(200);
+  }
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
@@ -77,7 +91,8 @@ app.get('/api/health', (req, res) => {
     status: 'OK', 
     timestamp: new Date().toISOString(),
     service: 'Language Learning API',
-    version: '1.0.0'
+    version: '1.0.0',
+    cors: 'enabled'
   });
 });
 
@@ -94,6 +109,7 @@ app.use('*', (req, res) => {
   res.status(404).json({ 
     error: 'Route not found',
     path: req.originalUrl,
+    method: req.method,
     availableRoutes: [
       'GET /api/health',
       'POST /api/auth/register',
@@ -122,6 +138,5 @@ app.listen(PORT, '0.0.0.0', () => {
   console.log(`   - Reviews: /api/reviews`);
   console.log(`   - Statistics: /api/stats`);
   console.log(`   - Authentication: /api/auth`);
+  console.log(`🔧 CORS enabled for development`);
 });
-
-export default app;
