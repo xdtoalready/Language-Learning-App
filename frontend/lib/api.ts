@@ -289,41 +289,41 @@ if (contentType && contentType.includes('application/json')) {
 
    // ===== МЕТОДЫ ДЛЯ СЛОВ ДРУЗЕЙ =====
 
-  /**
-   * Получить активные слова друга
-   */
-  async getFriendWords(
+    /**
+     * Получить активные слова друга
+     */
+    async getFriendWords(
     friendId: string, 
     params?: {
-      search?: string;
-      tags?: string;
-      page?: number;
-      limit?: number;
+        search?: string;
+        tags?: string;
+        page?: number;
+        limit?: number;
     }
-  ): Promise<FriendWordsResponse> {
-    const queryParams = new URLSearchParams();
-    
-    if (params?.search) queryParams.append('search', params.search);
-    if (params?.tags) queryParams.append('tags', params.tags);
-    if (params?.page) queryParams.append('page', params.page.toString());
-    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    ): Promise<FriendWordsResponse> {
+        const queryParams = new URLSearchParams();
+        
+        if (params?.search) queryParams.append('search', params.search);
+        if (params?.tags) queryParams.append('tags', params.tags);
+        if (params?.page) queryParams.append('page', params.page.toString());
+        if (params?.limit) queryParams.append('limit', params.limit.toString());
 
-    const query = queryParams.toString();
-    const endpoint = `/friends/${friendId}/words${query ? `?${query}` : ''}`;
-    
-    console.log('🔍 Загружаем слова друга:', { friendId, params });
-    return this.request<FriendWordsResponse>(endpoint);
-  }
+        const query = queryParams.toString();
+        const endpoint = `/friendships/${friendId}/words${query ? `?${query}` : ''}`;
+        
+        console.log('🔍 Загружаем слова друга:', { friendId, params });
+        return this.request<FriendWordsResponse>(endpoint);
+    }
 
-  /**
-   * Копировать слово друга к себе в словарь
-   */
-  async copyFriendWord(friendId: string, wordId: string): Promise<CopyWordResponse> {
-    console.log('📋 Копируем слово друга:', { friendId, wordId });
-    return this.request<CopyWordResponse>(`/friends/${friendId}/words/${wordId}/copy`, {
-      method: 'POST'
-    });
-  }
+    /**
+     * Копировать слово друга к себе в словарь
+     */
+    async copyFriendWord(friendId: string, wordId: string): Promise<CopyWordResponse> {
+        console.log('📋 Копируем слово друга:', { friendId, wordId });
+        return this.request<CopyWordResponse>(`/friendships/${friendId}/words/${wordId}/copy`, {
+            method: 'POST'
+        });
+    }
 
   // ============== МЕТОДЫ ДРУЗЕЙ ==============
   
