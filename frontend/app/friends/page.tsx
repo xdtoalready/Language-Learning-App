@@ -1,4 +1,4 @@
-// frontend/app/friends/page.tsx
+// frontend/app/friends/page.tsx (обновленная с SVG облачками)
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -19,50 +19,12 @@ import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { CloudStreak } from '@/components/ui/CloudStreak';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { useFriends } from '@/store/useStore';
 import { LANGUAGES } from '@/lib/utils';
 
 type TabType = 'friends' | 'search' | 'requests';
-
-// Функция для получения облачка в зависимости от серии
-const getCloudStatus = (days: number) => {
-  if (days >= 21) return { 
-    emoji: '☁️✨', 
-    color: 'text-yellow-500', 
-    bg: 'bg-yellow-50',
-    label: 'Золотое облачко',
-    description: '21+ дней совместного изучения!'
-  };
-  if (days >= 11) return { 
-    emoji: '☁️🌟', 
-    color: 'text-green-500', 
-    bg: 'bg-green-50',
-    label: 'Большое облачко',
-    description: '11-20 дней вместе'
-  };
-  if (days >= 6) return { 
-    emoji: '☁️💙', 
-    color: 'text-blue-500', 
-    bg: 'bg-blue-50',
-    label: 'Среднее облачко',
-    description: '6-10 дней активности'
-  };
-  if (days >= 1) return { 
-    emoji: '☁️', 
-    color: 'text-gray-500', 
-    bg: 'bg-gray-50',
-    label: 'Маленькое облачко',
-    description: '1-5 дней изучения'
-  };
-  return { 
-    emoji: '⭕', 
-    color: 'text-gray-300', 
-    bg: 'bg-gray-50',
-    label: 'Нет активности',
-    description: 'Начните изучать вместе!'
-  };
-};
 
 export default function FriendsPage() {
   const [activeTab, setActiveTab] = useState<TabType>('friends');
@@ -167,9 +129,38 @@ export default function FriendsPage() {
     return date.toLocaleDateString();
   };
 
+  // Функция для отображения аватара
+  const renderAvatar = (avatar: string | null, size: string = 'w-16 h-16') => {
+    if (!avatar) {
+      return (
+        <div className={`${size} bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold`}>
+          👤
+        </div>
+      );
+    }
+
+    // Если аватар начинается с data: (base64 изображение)
+    if (avatar.startsWith('data:')) {
+      return (
+        <img 
+          src={avatar} 
+          alt="Avatar" 
+          className={`${size} rounded-full object-cover border-2 border-white shadow-lg`}
+        />
+      );
+    }
+
+    // Если аватар - эмодзи или текст
+    return (
+      <div className={`${size} bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-2xl`}>
+        {avatar}
+      </div>
+    );
+  };
+
   return (
     <DashboardLayout>
-      <div className="max-w-4xl mx-auto space-y-6">
+      <div className="max-w-6xl mx-auto space-y-6">
         {/* Заголовок */}
         <div className="flex items-center justify-between">
           <div>
@@ -194,32 +185,32 @@ export default function FriendsPage() {
         >
           <Card className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-200">
             <CardContent className="p-6">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-6">
                 <div className="text-4xl">💬</div>
-                <div>
+                <div className="flex-1">
                   <h3 className="font-semibold text-lg text-gray-900 mb-2">
                     Система облачков мотивации
                   </h3>
-                  <p className="text-gray-700 text-sm mb-3">
+                  <p className="text-gray-700 text-sm mb-4">
                     Изучайте языки вместе с друзьями! Когда вы оба выполняете дневную норму (повторяете слова), 
-                    ваше общее облачко растет и меняется:
+                    ваше общее облачко растет и становится красивее:
                   </p>
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">☁️</span>
-                      <span>1-5 дней</span>
+                  <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-3">
+                      <CloudStreak days={3} size="sm" />
+                      <span className="text-xs text-gray-600">1-5 дней</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">☁️💙</span>
-                      <span>6-10 дней</span>
+                    <div className="flex items-center gap-3">
+                      <CloudStreak days={8} size="sm" />
+                      <span className="text-xs text-gray-600">6-10 дней</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">☁️🌟</span>
-                      <span>11-20 дней</span>
+                    <div className="flex items-center gap-3">
+                      <CloudStreak days={15} size="sm" />
+                      <span className="text-xs text-gray-600">11-20 дней</span>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-lg">☁️✨</span>
-                      <span>21+ дней</span>
+                    <div className="flex items-center gap-3">
+                      <CloudStreak days={25} size="sm" />
+                      <span className="text-xs text-gray-600">21+ дней</span>
                     </div>
                   </div>
                 </div>
@@ -283,29 +274,30 @@ export default function FriendsPage() {
                 </div>
               ) : friends.length === 0 ? (
                 <Card>
-                  <CardContent className="text-center py-8">
-                    <UsersIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Пока нет друзей</h3>
-                    <p className="text-gray-500 mb-4">
-                      Найдите друзей и изучайте языки вместе!
+                  <CardContent className="text-center py-12">
+                    <UsersIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-gray-900 mb-2">Пока нет друзей</h3>
+                    <p className="text-gray-500 mb-6">
+                      Найдите друзей и изучайте языки вместе! Вместе веселее и эффективнее.
                     </p>
                     <Button onClick={() => setActiveTab('search')}>
+                      <UserPlusIcon className="h-4 w-4 mr-2" />
                       Найти друзей
                     </Button>
                   </CardContent>
                 </Card>
               ) : (
-                friends.map((friend) => {
-                  const cloudStatus = getCloudStatus(friend.cloudStreak || 0);
-                  return (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {friends.map((friend) => (
                     <FriendCard 
                       key={friend.id} 
                       friend={friend} 
-                      cloudStatus={cloudStatus}
                       onRemove={() => handleRemoveFriend(friend.friendshipId, friend.username)}
+                      formatLastActive={formatLastActive}
+                      renderAvatar={renderAvatar}
                     />
-                  );
-                })
+                  ))}
+                </div>
               )}
             </motion.div>
           )}
@@ -356,6 +348,7 @@ export default function FriendsPage() {
                           key={user.id} 
                           user={user} 
                           onSendRequest={() => handleSendFriendRequest(user.id)}
+                          renderAvatar={renderAvatar}
                         />
                       ))}
                     </div>
@@ -375,22 +368,25 @@ export default function FriendsPage() {
             >
               {pendingRequests.length === 0 ? (
                 <Card>
-                  <CardContent className="text-center py-8">
-                    <ClockIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Нет заявок</h3>
+                  <CardContent className="text-center py-12">
+                    <ClockIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+                    <h3 className="text-xl font-medium text-gray-900 mb-2">Нет заявок</h3>
                     <p className="text-gray-500">
                       У вас пока нет входящих заявок в друзья
                     </p>
                   </CardContent>
                 </Card>
               ) : (
-                pendingRequests.map((request) => (
-                  <PendingRequestCard 
-                    key={request.id} 
-                    request={request} 
-                    onRespond={(action) => handleRespondToRequest(request.id, action)}
-                  />
-                ))
+                <div className="space-y-4">
+                  {pendingRequests.map((request) => (
+                    <PendingRequestCard 
+                      key={request.id} 
+                      request={request} 
+                      onRespond={(action) => handleRespondToRequest(request.id, action)}
+                      renderAvatar={renderAvatar}
+                    />
+                  ))}
+                </div>
               )}
             </motion.div>
           )}
@@ -400,25 +396,24 @@ export default function FriendsPage() {
   );
 }
 
-// Компонент карточки друга
-const FriendCard = ({ friend, cloudStatus, onRemove }: { 
+// Компонент карточки друга с красивым облачком
+const FriendCard = ({ friend, onRemove, formatLastActive, renderAvatar }: { 
   friend: any; 
-  cloudStatus: any; 
   onRemove: () => void;
+  formatLastActive: (date: string | Date | null) => string;
+  renderAvatar: (avatar: string | null, size?: string) => JSX.Element;
 }) => {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-lg transition-all duration-300"
+      className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-xl transition-all duration-300"
     >
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between mb-4">
         {/* Левая часть - аватар и инфо */}
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-            <span className="text-2xl">{friend.avatar || '👤'}</span>
-          </div>
-
+          {renderAvatar(friend.avatar)}
+          
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-lg text-gray-900">{friend.username}</h3>
@@ -437,43 +432,35 @@ const FriendCard = ({ friend, cloudStatus, onRemove }: {
             </div>
             
             <p className="text-xs text-gray-500">
-              Активность: {friend.lastActiveDate ? new Date(friend.lastActiveDate).toLocaleDateString() : 'давно'}
+              Активность: {formatLastActive(friend.lastActiveDate)}
             </p>
           </div>
         </div>
 
-        {/* Правая часть - облачко мотивации */}
-        <div className="text-center">
-          <div className={`${cloudStatus.bg} rounded-xl p-4 min-w-[120px]`}>
-            <div className="text-3xl mb-2">{cloudStatus.emoji}</div>
-            <div className={`font-bold text-lg ${cloudStatus.color}`}>
-              {friend.cloudStreak || 0} дней
-            </div>
-            <div className="text-xs font-medium text-gray-600 mt-1">
-              {cloudStatus.label}
-            </div>
-          </div>
-          <p className="text-xs text-gray-500 mt-2 max-w-[120px]">
-            {cloudStatus.description}
-          </p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onRemove}
-            className="mt-2 text-xs"
-          >
-            Удалить
-          </Button>
-        </div>
+        {/* Кнопка удаления */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={onRemove}
+          className="text-gray-400 hover:text-red-500"
+        >
+          <XMarkIcon className="h-4 w-4" />
+        </Button>
+      </div>
+
+      {/* Облачко мотивации по центру */}
+      <div className="flex justify-center">
+        <CloudStreak days={friend.cloudStreak || 0} size="lg" />
       </div>
     </motion.div>
   );
 };
 
 // Компонент карточки поиска пользователя
-const UserSearchCard = ({ user, onSendRequest }: { 
+const UserSearchCard = ({ user, onSendRequest, renderAvatar }: { 
   user: any; 
   onSendRequest: () => void;
+  renderAvatar: (avatar: string | null, size?: string) => JSX.Element;
 }) => {
   const getStatusButton = () => {
     switch (user.friendshipStatus) {
@@ -507,11 +494,9 @@ const UserSearchCard = ({ user, onSendRequest }: {
   };
 
   return (
-    <div className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50">
+    <div className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors">
       <div className="flex items-center gap-3">
-        <div className="w-12 h-12 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-          <span className="text-lg">{user.avatar || '👤'}</span>
-        </div>
+        {renderAvatar(user.avatar, 'w-12 h-12')}
         <div>
           <div className="flex items-center gap-2">
             <h4 className="font-medium text-gray-900">{user.username}</h4>
@@ -532,9 +517,10 @@ const UserSearchCard = ({ user, onSendRequest }: {
 };
 
 // Компонент карточки входящей заявки
-const PendingRequestCard = ({ request, onRespond }: { 
+const PendingRequestCard = ({ request, onRespond, renderAvatar }: { 
   request: any; 
   onRespond: (action: 'accept' | 'reject') => void;
+  renderAvatar: (avatar: string | null, size?: string) => JSX.Element;
 }) => {
   return (
     <motion.div
@@ -544,9 +530,7 @@ const PendingRequestCard = ({ request, onRespond }: {
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
-          <div className="w-16 h-16 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-            <span className="text-2xl">{request.user.avatar || '👤'}</span>
-          </div>
+          {renderAvatar(request.user.avatar)}
           <div>
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-lg text-gray-900">{request.user.username}</h3>

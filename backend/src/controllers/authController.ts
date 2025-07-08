@@ -196,60 +196,100 @@ export const login = async (req: Request, res: Response): Promise<void> => {
 /**
  * Обновление профиля пользователя
  */
-export const updateProfile = async (req: Request, res: Response): Promise<void> => {
+export const updateProfile = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
-    const userId = (req as any).userId;
+    const userId = req.userId!;
     const { username, learningLanguage, dailyGoal, avatar } = req.body;
 
-    // Проверяем, что пользователь существует
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userId }
-    });
-
-    if (!existingUser) {
-      res.status(404).json({ error: 'User not found' });
-      return;
-    }
-
-    // Подготавливаем данные для обновления
+    // Валидация данных
     const updateData: any = {};
 
     if (username !== undefined) {
-      // Проверяем уникальность username (если он изменился)
-      if (username !== existingUser.username) {
-        const usernameExists = await prisma.user.findFirst({
-          where: {
-            username: username.toLowerCase(),
-            id: { not: userId }
-          }
-        });
-
-        if (usernameExists) {
-          res.status(400).json({ error: 'Username already taken' });
-          return;
-        }
+      if (typeof username !== 'string' || username.trim().length < 2) {
+        res.status(400).json({ error: 'Username must be at least 2 characters long' });
+        return;
       }
-      updateData.username = username.toLowerCase();
+      
+      // Проверяем уникальность username (исключая текущего пользователя)
+      const existingUser = await prisma.user.findFirst({
+        where: { 
+          username: username.trim(),
+          id: { not: userId }
+        }
+      });
+      
+      if (existingUser) {
+        res.status(400).json({ error: 'Username already taken' });
+        return;
+      }
+      
+      updateData.username = username.trim();
     }
 
     if (learningLanguage !== undefined) {
+      const validLanguages = ['English', 'Korean', 'Chinese', 'Spanish', 'French', 'German', 'Japanese'];
+      if (!validLanguages.includes(learningLanguage)) {
+        res.status(400).json({ error: 'Invalid learning language' });
+        return;
+      }
       updateData.learningLanguage = learningLanguage;
     }
 
     if (dailyGoal !== undefined) {
-      // Валидация дневной цели
-      const goal = parseInt(dailyGoal);
-      if (isNaN(goal) || goal < 1 || goal > 100) {
-        res.status(400).json({ 
-          error: 'Daily goal must be between 1 and 100' 
-        });
+      if (typeof dailyGoal !== 'number' || dailyGoal < 1 || dailyGoal > 100) {
+        res.status(400).json({ error: 'Daily goal must be between 1 and 100' });
         return;
       }
-      updateData.dailyGoal = goal;
+      updateData.dailyGoal = dailyGoal;
     }
 
     if (avatar !== undefined) {
-      updateData.avatar = avatar;
+      // Проверяем тип аватара
+      if (typeof avatar !== 'string') {
+        res.status(400).json({ error: 'Avatar must be a string' });
+        return;
+      }
+
+      // Если аватар пустой - убираем его
+      if (avatar === '') {
+        updateData.avatar = null;
+      }
+      // Если аватар начинается с data: - это base64 изображение
+      else if (avatar.startsWith('data:image/')) {
+        // Проверяем размер base64 (примерно 5MB в base64 = ~6.7MB строка)
+        if (avatar.length > 7000000) {
+          res.status(400).json({ error: 'Image too large. Maximum size is 5MB' });
+          return;
+        }
+
+        // Проверяем валидность base64
+        try {
+          const base64Data = avatar.split(',')[1];
+          if (!base64Data) {
+            throw new Error('Invalid base64 format');
+          }
+          Buffer.from(base64Data, 'base64');
+        } catch (error) {
+          res.status(400).json({ error: 'Invalid image format' });
+          return;
+        }
+
+        updateData.avatar = avatar;
+      }
+      // Иначе это эмодзи или текст
+      else {
+        if (avatar.length > 10) {
+          res.status(400).json({ error: 'Avatar text too long' });
+          return;
+        }
+        updateData.avatar = avatar;
+      }
+    }
+
+    // Проверяем, что есть данные для обновления
+    if (Object.keys(updateData).length === 0) {
+      res.status(400).json({ error: 'No valid fields to update' });
+      return;
     }
 
     // Обновляем пользователя
@@ -262,11 +302,14 @@ export const updateProfile = async (req: Request, res: Response): Promise<void> 
         username: true,
         avatar: true,
         learningLanguage: true,
+        dailyGoal: true,
         currentStreak: true,
         longestStreak: true,
         totalWordsLearned: true,
-        dailyGoal: true,
-        joinDate: true
+        joinDate: true,
+        lastActiveDate: true,
+        createdAt: true,
+        updatedAt: true
       }
     });
 
