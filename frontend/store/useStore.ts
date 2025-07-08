@@ -1,7 +1,6 @@
 // store/useStore.ts
 
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
 import { User, Word, UserStats, WordStats } from '@/types/api';
 import apiClient from '@/lib/api';
 
@@ -59,9 +58,7 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   setLoading: (type: 'auth' | 'words' | 'stats', value: boolean) => void;
 }
 
-export const useStore = create<AppStore>()(
-  persist(
-    (set, get) => ({
+export const useStore = create<AppStore>((set, get) => ({{
       // Initial state
       user: null,
       isAuthenticated: false,
@@ -286,14 +283,6 @@ export const useStore = create<AppStore>()(
             break;
         }
       }
-    }),
-    {
-      name: 'language-learning-store',
-      partialize: (state) => ({
-        // Сохраняем в localStorage только критически важные данные
-        user: state.user,
-        isAuthenticated: state.isAuthenticated,
-      }),
     }
   )
 );
