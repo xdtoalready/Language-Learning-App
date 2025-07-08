@@ -35,11 +35,37 @@ app.use(limiter);
 app.use(cors({
   origin: [
     'http://localhost:3000',
+    'http://127.0.0.1:3000',
     'http://5.129.203.118:3000',  // Ваш внешний IP
     /^http:\/\/.*:3000$/         // Любой IP на порту 3000
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: [
+    'Origin',
+    'X-Requested-With',
+    'Content-Type',
+    'Accept',
+    'Authorization',
+    'Cache-Control',
+    'Pragma'
+  ],
+  exposedHeaders: ['set-cookie'],
+  optionsSuccessStatus: 200
 }));
+
+// Дополнительная обработка OPTIONS запросов
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.header('Access-Control-Allow-Origin', req.headers.origin || '*');
+    res.header('Access-Control-Allow-Methods', 'GET,PUT,POST,DELETE,OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Content-Length, X-Requested-With');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));

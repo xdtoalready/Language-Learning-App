@@ -50,42 +50,79 @@ class ApiClient {
   }
 
   // Базовый метод для выполнения запросов
-  private async request<T>(
-    endpoint: string,
-    options: RequestInit = {}
-  ): Promise<T> {
-    const url = `${this.baseURL}${endpoint}`;
-    
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
+private async request<T>(
+  endpoint: string,
+  options: RequestInit = {}
+): Promise<T> {
+  const url = `${this.baseURL}${endpoint}`;
+  
+  const headers: HeadersInit = {
+    'Content-Type': 'application/json',
+    ...options.headers,
+  };
 
-    // Добавляем токен авторизации если он есть
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
+  // Добавляем токен авторизации если он есть
+  if (this.token) {
+    headers.Authorization = `Bearer ${this.token}`;
+  }
+
+  try {
+    console.log('🚀 API Request:', { url, method: options.method || 'GET', headers });
+    
+    const response = await fetch(url, {
+      ...options,
+      headers,
+      // Добавляем credentials для CORS
+      credentials: 'include'
+    });
+
+    console.log('📡 API Response:', { 
+      status: response.status, 
+      ok: response.ok, 
+      url: response.url 
+    });
+
+    // Проверяем, есть ли содержимое для парсинга
+    const contentType = response.headers.get('content-type');
+    let data: any = null;
+    
+    if (contentType && contentType.includes('application/json')) {
+      try {
+        data = await response.json();
+      } catch (jsonError) {
+        console.error('❌ JSON Parse Error:', jsonError);
+        data = { error: 'Invalid JSON response' };
+      }
+    } else {
+      // Если не JSON, получаем как текст
+      const textResponse = await response.text();
+      console.log('📄 Non-JSON Response:', textResponse);
+      data = { error: textResponse || 'No response body' };
     }
 
-    try {
-      const response = await fetch(url, {
-        ...options,
-        headers,
-      });
+    if (!response.ok) {
+      const errorMessage = data?.error || data?.message || `HTTP error! status: ${response.status}`;
+      console.error('❌ API Error:', errorMessage);
+      throw new Error(errorMessage);
+    }
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || `HTTP error! status: ${response.status}`);
-      }
-
-      return data;
-    } catch (error) {
-      if (error instanceof Error) {
+    console.log('✅ API Success:', data);
+    return data;
+  } catch (error) {
+    console.error('🔥 Network/Fetch Error:', error);
+    
+    if (error instanceof Error) {
+      // Если это наша ошибка из ответа сервера
+      if (error.message.includes('HTTP error!') || error.message.includes('error')) {
         throw error;
       }
-      throw new Error('Network error occurred');
+      // Если это сетевая ошибка
+      throw new Error(`Сетевая ошибка: ${error.message}`);
     }
+    
+    throw new Error('Неизвестная ошибка сети');
   }
+}
 
   // Методы аутентификации
   async register(userData: RegisterRequest): Promise<AuthResponse> {

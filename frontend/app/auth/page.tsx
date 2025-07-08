@@ -30,27 +30,29 @@ export default function AuthPage() {
     }
   }, [isAuthenticated, router]);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
     try {
-      if (isLogin) {
+        if (isLogin) {
+        // ИСПРАВЛЕНО: передаем emailOrUsername вместо email
         await login(formData.email, formData.password);
         toast.success('Добро пожаловать!');
-      } else {
+        } else {
         await register(
-          formData.email,
-          formData.username,
-          formData.password,
-          formData.learningLanguage
+            formData.email,
+            formData.username,
+            formData.password,
+            formData.learningLanguage
         );
         toast.success('Аккаунт успешно создан!');
-      }
-      router.push('/dashboard');
+        }
+        router.push('/dashboard');
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Произошла ошибка');
+        console.error('Auth error:', error);
+        toast.error(error instanceof Error ? error.message : 'Произошла ошибка');
     }
-  };
+    };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData({

@@ -32,7 +32,7 @@ interface ReviewState {
 
 interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   // Auth actions
-  login: (email: string, password: string) => Promise<void>;
+  login: (emailOrUsername: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string, learningLanguage: string) => Promise<void>;
   logout: () => void;
   loadProfile: () => Promise<void>;
@@ -76,49 +76,71 @@ export const useStore = create<AppStore>((set, get) => ({
       remainingWords: 0,
 
       // Auth actions
-      login: async (emailOrUsername: string, password: string) => {
-        set({ isLoading: true });
-        try {
-          const response = await apiClient.login({ emailOrUsername, password });
-          set({
-            user: response.user,
-            isAuthenticated: true,
-            isLoading: false
-          });
-        } catch (error) {
-          set({ isLoading: false });
-          throw error;
-        }
-      },
+        login: async (emailOrUsername: string, password: string) => {
+            set({ isLoading: true });
+            try {
+            console.log('🔑 Пытаемся войти:', { emailOrUsername, password: '***' });
+            
+            const response = await apiClient.login({ emailOrUsername, password });
+            
+            console.log('✅ Успешный вход:', response);
+            
+            set({
+                user: response.user,
+                isAuthenticated: true,
+                isLoading: false
+            });
+            } catch (error) {
+            console.error('❌ Ошибка входа:', error);
+            set({ isLoading: false });
+            throw error;
+            }
+        },
 
-      register: async (email: string, username: string, password: string, learningLanguage: string) => {
-        set({ isLoading: true });
-        try {
-          const response = await apiClient.register({ email, username, password, learningLanguage });
-          set({
-            user: response.user,
-            isAuthenticated: true,
-            isLoading: false
-          });
-        } catch (error) {
-          set({ isLoading: false });
-          throw error;
-        }
-      },
+        register: async (email: string, username: string, password: string, learningLanguage: string) => {
+            set({ isLoading: true });
+            try {
+            console.log('📝 Пытаемся зарегистрироваться:', { 
+                email, 
+                username, 
+                password: '***', 
+                learningLanguage 
+            });
+            
+            const response = await apiClient.register({ 
+                email, 
+                username, 
+                password, 
+                learningLanguage 
+            });
+            
+            console.log('✅ Успешная регистрация:', response);
+            
+            set({
+                user: response.user,
+                isAuthenticated: true,
+                isLoading: false
+            });
+            } catch (error) {
+            console.error('❌ Ошибка регистрации:', error);
+            set({ isLoading: false });
+            throw error;
+            }
+        },
 
-      logout: () => {
-        apiClient.logout();
-        set({
-          user: null,
-          isAuthenticated: false,
-          words: [],
-          dueWords: [],
-          userStats: null,
-          wordsStats: null,
-          isReviewSession: false,
-          currentReviewWord: null
-        });
-      },
+        logout: () => {
+            apiClient.logout();
+            set({
+            user: null,
+            isAuthenticated: false,
+            words: [],
+            dueWords: [],
+            userStats: null,
+            wordsStats: null,
+            isReviewSession: false,
+            currentReviewWord: null
+            });
+        },
 
       loadProfile: async () => {
         try {
