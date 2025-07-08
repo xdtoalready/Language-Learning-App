@@ -48,26 +48,46 @@ export default function NewWordPage() {
     });
   };
 
-  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === 'Enter' || e.key === ',') {
-      e.preventDefault();
-      const newTag = tagInput.trim();
-      if (newTag && !formData.tags.includes(newTag)) {
-        setFormData({
-          ...formData,
-          tags: [...formData.tags, newTag]
-        });
-        setTagInput('');
-      }
-    }
-  };
+  // Обработчик добавления тега при клике на готовый тег
+const handlePredefinedTagClick = (tag: string) => {
+  console.log('Клик по тегу:', tag); // Для отладки
+  if (!formData.tags.includes(tag)) {
+    setFormData(prev => ({
+      ...prev,
+      tags: [...prev.tags, tag]
+    }));
+    console.log('Тег добавлен:', tag); // Для отладки
+  } else {
+    console.log('Тег уже существует:', tag); // Для отладки
+  }
+};
 
-  const handleRemoveTag = (tagToRemove: string) => {
-    setFormData({
-      ...formData,
-      tags: formData.tags.filter(tag => tag !== tagToRemove)
-    });
-  };
+// Обработчик добавления тега через клавиатуру
+const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+  if (e.key === 'Enter' || e.key === ',') {
+    e.preventDefault();
+    const newTag = tagInput.trim();
+    console.log('Добавление тега через клавиатуру:', newTag); // Для отладки
+    
+    if (newTag && !formData.tags.includes(newTag)) {
+      setFormData(prev => ({
+        ...prev,
+        tags: [...prev.tags, newTag]
+      }));
+      setTagInput('');
+      console.log('Тег добавлен через клавиатуру:', newTag); // Для отладки
+    }
+  }
+};
+
+// Обработчик удаления тега
+const handleRemoveTag = (tagToRemove: string) => {
+  console.log('Удаление тега:', tagToRemove); // Для отладки
+  setFormData(prev => ({
+    ...prev,
+    tags: prev.tags.filter(tag => tag !== tagToRemove)
+  }));
+};
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -208,22 +228,25 @@ export default function NewWordPage() {
                     Теги
                   </label>
                   
-                  {/* Добавленные теги */}
-                  {formData.tags.length > 0 && (
+                    {/* Добавленные теги */}
+                    {formData.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2 mb-3">
-                      {formData.tags.map((tag, index) => (
+                        {formData.tags.map((tag, index) => (
                         <Badge
-                          key={`added-tag-${index}-${tag}`}
-                          variant="primary"
-                          className="cursor-pointer hover:bg-red-100 hover:text-red-800"
-                          onClick={() => handleRemoveTag(tag)}
+                            key={`added-tag-${index}-${tag}`}
+                            variant="primary"
+                            className="cursor-pointer hover:bg-red-100 hover:text-red-800"
+                            onClick={(e) => {
+                            e.preventDefault();
+                            handleRemoveTag(tag);
+                            }}
                         >
-                          {tag}
-                          <XMarkIcon className="h-3 w-3 ml-1" />
+                            {tag}
+                            <XMarkIcon className="h-3 w-3 ml-1" />
                         </Badge>
-                      ))}
+                        ))}
                     </div>
-                  )}
+                    )}
 
                   {/* Поле ввода тега */}
                   <Input
@@ -235,32 +258,23 @@ export default function NewWordPage() {
                     helperText="Используйте теги для группировки слов по темам"
                   />
 
-                  {/* Готовые теги */}
-                  <div className="mt-3">
-                    <p className="text-sm font-medium text-gray-700 mb-2">
-                      Популярные теги:
-                    </p>
+                    {/* Готовые теги */}
                     <div className="flex flex-wrap gap-2">
-                      {predefinedTags.map((tag, tagIndex) => (
+                    {predefinedTags.map((tag, tagIndex) => (
                         <Badge
-                          key={`predefined-tag-${tagIndex}-${tag}`}
-                          variant={formData.tags.includes(tag) ? 'default' : 'secondary'}
-                          className="cursor-pointer hover:bg-blue-100 transition-colors"
-                          onClick={() => {
-                            if (!formData.tags.includes(tag)) {
-                              setFormData({
-                                ...formData,
-                                tags: [...formData.tags, tag]
-                              });
-                            }
-                          }}
+                        key={`predefined-tag-${tagIndex}-${tag}`}
+                        variant={formData.tags.includes(tag) ? 'default' : 'secondary'}
+                        className="cursor-pointer hover:bg-blue-100 transition-colors"
+                        onClick={(e) => {
+                            e.preventDefault();
+                            handlePredefinedTagClick(tag);
+                        }}
                         >
-                          {formData.tags.includes(tag) ? '✓ ' : '+ '}
-                          {tag}
+                        {formData.tags.includes(tag) ? '✓ ' : '+ '}
+                        {tag}
                         </Badge>
-                      ))}
+                    ))}
                     </div>
-                  </div>
                 </div>
 
                 {/* Кнопки */}
