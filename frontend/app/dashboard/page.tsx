@@ -1,7 +1,7 @@
 // app/dashboard/page.tsx
 'use client';
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   PlayIcon,
@@ -27,20 +27,42 @@ export default function DashboardPage() {
   const { startReviewSession } = useReview();
   const router = useRouter();
 
-  useEffect(() => {
-    console.log('📊 DashboardPage: Загружаем данные...');
+  // Мемоизированная функция загрузки данных
+  const loadDashboardData = useCallback(() => {
+    console.log('📊 DashboardPage: Проверяем, что нужно загрузить...');
     
-    // Загружаем данные только если они еще не загружены
+    // Загружаем данные только если они еще не загружены и не загружаются
+    const promises = [];
+    
     if (!wordsStats) {
-      loadWordsStats();
+      console.log('📊 Загружаем статистику слов...');
+      promises.push(loadWordsStats().catch(console.error));
     }
+    
     if (dueWords.length === 0) {
-      loadDueWords();
+      console.log('📅 Загружаем слова к повторению...');
+      promises.push(loadDueWords().catch(console.error));
     }
+    
     if (!userStats) {
-      loadUserStats();
+      console.log('👤 Загружаем статистику пользователя...');
+      promises.push(loadUserStats().catch(console.error));
     }
-  }, [loadDueWords, loadWordsStats, loadUserStats, wordsStats, dueWords.length, userStats]);
+
+    // Выполняем все загрузки параллельно, если есть что загружать
+    if (promises.length > 0) {
+      console.log(`🚀 Запускаем ${promises.length} загрузок...`);
+      Promise.allSettled(promises).then(() => {
+        console.log('✅ DashboardPage: Все загрузки завершены');
+      });
+    } else {
+      console.log('✅ DashboardPage: Все данные уже загружены');
+    }
+  }, [wordsStats, dueWords.length, userStats, loadWordsStats, loadDueWords, loadUserStats]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, [loadDashboardData]);
 
   const handleStartReview = async () => {
     try {

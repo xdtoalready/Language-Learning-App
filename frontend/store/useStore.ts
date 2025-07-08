@@ -255,30 +255,46 @@ export const useStore = create<AppStore>((set, get) => ({
 
   // Words actions
   loadWords: async (params?: any) => {
+    // Предотвращаем множественные одновременные запросы
+    if (get().isLoadingWords) {
+      console.log('⏸️ Загрузка уже в процессе, пропускаем запрос');
+      return;
+    }
+
     set({ isLoadingWords: true });
     try {
+      console.log('📚 Загружаем слова с параметрами:', params);
       const response = await apiClient.getWords(params);
+      console.log('✅ Слова загружены:', response.words.length);
       set({ 
         words: response.words,
         isLoadingWords: false 
       });
     } catch (error) {
-      console.error('Failed to load words:', error);
+      console.error('❌ Ошибка загрузки слов:', error);
       set({ isLoadingWords: false });
       throw error;
     }
   },
 
   loadDueWords: async () => {
+    // Предотвращаем множественные одновременные запросы
+    if (get().isLoadingWords) {
+      console.log('⏸️ Загрузка уже в процессе, пропускаем запрос due words');
+      return;
+    }
+
     set({ isLoadingWords: true });
     try {
+      console.log('📅 Загружаем слова к повторению...');
       const response = await apiClient.getDueWords();
+      console.log('✅ Слова к повторению загружены:', response.words.length);
       set({ 
         dueWords: response.words,
         isLoadingWords: false 
       });
     } catch (error) {
-      console.error('Failed to load due words:', error);
+      console.error('❌ Ошибка загрузки слов к повторению:', error);
       set({ isLoadingWords: false });
       throw error;
     }
@@ -330,10 +346,12 @@ export const useStore = create<AppStore>((set, get) => ({
 
   loadWordsStats: async () => {
     try {
+      console.log('📊 Загружаем статистику слов...');
       const response = await apiClient.getWordsStats();
+      console.log('✅ Статистика слов загружена:', response.stats);
       set({ wordsStats: response.stats });
     } catch (error) {
-      console.error('Failed to load words stats:', error);
+      console.error('❌ Ошибка загрузки статистики слов:', error);
       throw error;
     }
   },

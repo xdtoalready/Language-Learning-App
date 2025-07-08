@@ -1,7 +1,7 @@
 // app/stats/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   ChartBarIcon,
@@ -50,12 +50,21 @@ export default function StatsPage() {
   const { userStats, isLoadingStats, loadUserStats, updateDailyGoal } = useStats();
   const { user } = useAuth();
 
-  useEffect(() => {
-    if (!userStats) {
+  // Мемоизированная функция загрузки статистики
+  const loadStatsOnce = useCallback(() => {
+    if (!userStats && !isLoadingStats) {
       console.log('📈 StatsPage: Загружаем статистику...');
-      loadUserStats();
+      loadUserStats().catch(console.error);
+    } else if (userStats) {
+      console.log('✅ StatsPage: Статистика уже загружена');
+    } else if (isLoadingStats) {
+      console.log('⏳ StatsPage: Статистика уже загружается');
     }
-  }, [loadUserStats, userStats]);
+  }, [userStats, isLoadingStats, loadUserStats]);
+
+  useEffect(() => {
+    loadStatsOnce();
+  }, [loadStatsOnce]);
 
   const handleUpdateGoal = async () => {
     const goal = parseInt(newGoal);
