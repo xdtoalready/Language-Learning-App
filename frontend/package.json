@@ -1,9 +1,9 @@
 {
-  "name": "frontend",
+  "name": "language-learning-frontend",
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -11,7 +11,18 @@
   "dependencies": {
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
-    "next": "15.3.5"
+    "next": "15.3.5",
+    "@heroicons/react": "^2.0.18",
+    "framer-motion": "^11.1.7",
+    "zustand": "^4.5.2",
+    "react-hook-form": "^7.51.3",
+    "@hookform/resolvers": "^3.3.4",
+    "zod": "^3.23.8",
+    "recharts": "^2.12.6",
+    "react-hot-toast": "^2.4.1",
+    "lucide-react": "^0.379.0",
+    "clsx": "^2.1.1",
+    "tailwind-merge": "^2.3.0"
   },
   "devDependencies": {
     "typescript": "^5",
