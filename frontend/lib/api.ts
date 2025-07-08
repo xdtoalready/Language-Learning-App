@@ -142,6 +142,10 @@ if (contentType && contentType.includes('application/json')) {
     }
   }
 
+  async getFriendProfile(friendId: string): Promise<{ friend: any }> {
+  return this.request<{ friend: any }>(`/friendships/${friendId}/profile`);
+}
+
   // Методы аутентификации
   async register(userData: RegisterRequest): Promise<AuthResponse> {
     const response = await this.request<AuthResponse>('/auth/register', {

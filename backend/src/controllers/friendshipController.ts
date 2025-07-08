@@ -209,12 +209,13 @@ export const getFriendProfile = async (req: AuthRequest, res: Response): Promise
     
     // Формируем ответ
     const friendProfile = {
-      ...friendUser,
-      isFriend,
-      friendshipDate: friendship?.createdAt || null,
-      cloudStreak: friendship?.cloudStreak?.currentStreak || 0,
-      longestCloudStreak: friendship?.cloudStreak?.longestStreak || 0,
-      lastCloudActivity: friendship?.cloudStreak?.lastActiveDate || null
+    ...friendUser,
+    isFriend,
+    friendshipId: friendship?.id || null,
+    friendshipDate: friendship?.createdAt || null,
+    cloudStreak: friendship?.cloudStreak?.currentStreak || 0,
+    longestCloudStreak: friendship?.cloudStreak?.longestStreak || 0,
+    lastCloudActivity: friendship?.cloudStreak?.lastActiveDate || null
     };
 
     res.json({ friend: friendProfile });

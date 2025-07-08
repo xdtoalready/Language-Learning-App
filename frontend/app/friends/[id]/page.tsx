@@ -23,6 +23,7 @@ import { CloudStreak } from '@/components/ui/CloudStreak';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { formatDate, getStreakEmoji, LANGUAGES } from '@/lib/utils';
 import { useFriends } from '@/store/useStore';
+import { apiClient } from '@/lib/api';
 
 interface FriendProfile {
   id: string;
@@ -32,6 +33,7 @@ interface FriendProfile {
   currentStreak: number;
   longestStreak: number;
   totalWordsLearned: number;
+  friendshipId: string | null;
   joinDate: string;
   lastActiveDate: string | null;
   friendshipDate: string;
@@ -54,30 +56,19 @@ export default function FriendProfilePage() {
   // Загружаем профиль друга
   useEffect(() => {
     const loadFriendProfile = async () => {
-      try {
+    try {
         setIsLoading(true);
         
-        // Вызов API для получения профиля друга
-        const response = await fetch(`/api/friends/${friendId}/profile`, {
-          headers: {
-            'Authorization': `Bearer ${localStorage.getItem('auth_token')}`
-          }
-        });
-
-        if (!response.ok) {
-          throw new Error('Friend not found');
-        }
-
-        const data = await response.json();
+        const data = await apiClient.getFriendProfile(friendId);
         setFriendProfile(data.friend);
         
-      } catch (error) {
+    } catch (error) {
         console.error('Error loading friend profile:', error);
         toast.error('Ошибка загрузки профиля друга');
         router.push('/friends');
-      } finally {
+    } finally {
         setIsLoading(false);
-      }
+    }
     };
 
     if (friendId) {
@@ -85,23 +76,23 @@ export default function FriendProfilePage() {
     }
   }, [friendId, router]);
 
-  const handleRemoveFriend = async () => {
-    if (!friendProfile) return;
+    const handleRemoveFriend = async () => {
+    if (!friendProfile || !friendProfile.friendshipId) return;
     
     const confirmed = window.confirm(`Удалить ${friendProfile.username} из друзей?`);
     if (!confirmed) return;
 
     try {
-      setIsRemoving(true);
-      await removeFriend(friendProfile.id);
-      toast.success(`${friendProfile.username} удален из друзей`);
-      router.push('/friends');
+        setIsRemoving(true);
+        await removeFriend(friendProfile.friendshipId);
+        toast.success(`${friendProfile.username} удален из друзей`);
+        router.push('/friends');
     } catch (error) {
-      toast.error('Ошибка при удалении друга');
+        toast.error('Ошибка при удалении друга');
     } finally {
-      setIsRemoving(false);
+        setIsRemoving(false);
     }
-  };
+    };
 
   // Функция для отображения аватара
   const renderAvatar = (avatar: string | null, size: string = 'w-24 h-24') => {
