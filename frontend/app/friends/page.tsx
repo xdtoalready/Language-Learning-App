@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   MagnifyingGlassIcon,
@@ -260,47 +261,48 @@ export default function FriendsPage() {
 
         {/* Контент вкладок */}
         <AnimatePresence mode="wait">
-          {activeTab === 'friends' && (
+            {activeTab === 'friends' && (
             <motion.div
-              key="friends"
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: -20 }}
-              className="space-y-4"
+                key="friends"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-4"
             >
-              {isLoadingFriends ? (
+                {isLoadingFriends ? (
                 <div className="flex justify-center py-8">
-                  <LoadingSpinner />
+                    <LoadingSpinner />
                 </div>
-              ) : friends.length === 0 ? (
+                ) : friends.length === 0 ? (
                 <Card>
-                  <CardContent className="text-center py-12">
+                    <CardContent className="text-center py-12">
                     <UsersIcon className="h-16 w-16 text-gray-300 mx-auto mb-4" />
                     <h3 className="text-xl font-medium text-gray-900 mb-2">Пока нет друзей</h3>
                     <p className="text-gray-500 mb-6">
-                      Найдите друзей и изучайте языки вместе! Вместе веселее и эффективнее.
+                        Найдите друзей и изучайте языки вместе! Вместе веселее и эффективнее.
                     </p>
                     <Button onClick={() => setActiveTab('search')}>
-                      <UserPlusIcon className="h-4 w-4 mr-2" />
-                      Найти друзей
+                        <UserPlusIcon className="h-4 w-4 mr-2" />
+                        Найти друзей
                     </Button>
-                  </CardContent>
+                    </CardContent>
                 </Card>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {friends.map((friend) => (
+                ) : (
+                // ИЗМЕНИЛИ: теперь используем 3 колонки вместо 2
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {friends.map((friend) => (
                     <FriendCard 
-                      key={friend.id} 
-                      friend={friend} 
-                      onRemove={() => handleRemoveFriend(friend.friendshipId, friend.username)}
-                      formatLastActive={formatLastActive}
-                      renderAvatar={renderAvatar}
+                        key={friend.id} 
+                        friend={friend} 
+                        onRemove={() => handleRemoveFriend(friend.friendshipId, friend.username)}
+                        formatLastActive={formatLastActive}
+                        renderAvatar={renderAvatar}
                     />
-                  ))}
+                    ))}
                 </div>
-              )}
+                )}
             </motion.div>
-          )}
+            )}
 
           {activeTab === 'search' && (
             <motion.div
@@ -397,10 +399,9 @@ export default function FriendsPage() {
 }
 
 // Компонент карточки друга с красивым облачком
-const FriendCard = ({ friend, onRemove, formatLastActive, renderAvatar }: { 
+const FriendCard = ({ friend, onRemove, renderAvatar }: { 
   friend: any; 
   onRemove: () => void;
-  formatLastActive: (date: string | Date | null) => string;
   renderAvatar: (avatar: string | null, size?: string) => JSX.Element;
 }) => {
   return (
@@ -409,17 +410,19 @@ const FriendCard = ({ friend, onRemove, formatLastActive, renderAvatar }: {
       animate={{ opacity: 1, scale: 1 }}
       className="bg-white border border-gray-200 rounded-xl p-6 hover:shadow-xl transition-all duration-300"
     >
-      <div className="flex items-start justify-between mb-4">
+      <div className="flex items-start justify-between">
         {/* Левая часть - аватар и инфо */}
         <div className="flex items-center gap-4">
           {renderAvatar(friend.avatar)}
           
-          <div>
+          <div className="flex-1">
             <div className="flex items-center gap-2 mb-1">
               <h3 className="font-semibold text-lg text-gray-900">{friend.username}</h3>
               <span className="text-xl">
                 {LANGUAGES[friend.learningLanguage as keyof typeof LANGUAGES]?.flag || '🌍'}
               </span>
+              {/* Маленькое облачко рядом с ником */}
+              <CloudStreak days={friend.cloudStreak || 0} size="xs" />
             </div>
             
             <div className="flex items-center gap-4 text-sm text-gray-600 mb-2">
@@ -448,9 +451,20 @@ const FriendCard = ({ friend, onRemove, formatLastActive, renderAvatar }: {
         </Button>
       </div>
 
-      {/* Облачко мотивации по центру */}
-      <div className="flex justify-center">
-        <CloudStreak days={friend.cloudStreak || 0} size="lg" />
+      {/* Кнопка просмотра профиля */}
+      <div className="mt-4 flex justify-center">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            // Переход к профилю друга
+            window.location.href = `/friends/${friend.id}`;
+          }}
+          className="flex items-center gap-2"
+        >
+          <UserIcon className="h-4 w-4" />
+          Посмотреть профиль
+        </Button>
       </div>
     </motion.div>
   );

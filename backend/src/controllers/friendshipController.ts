@@ -159,6 +159,73 @@ interface AuthRequest extends Request {
 }
 
 /**
+ * Получить профиль друга
+ */
+export const getFriendProfile = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { friendId } = req.params;
+
+    if (!friendId) {
+      res.status(400).json({ error: 'Friend ID is required' });
+      return;
+    }
+
+    // Проверяем, что пользователь существует
+    const friendUser = await prisma.user.findUnique({
+      where: { id: friendId },
+      select: {
+        id: true,
+        username: true,
+        avatar: true,
+        learningLanguage: true,
+        currentStreak: true,
+        longestStreak: true,
+        totalWordsLearned: true,
+        joinDate: true,
+        lastActiveDate: true
+      }
+    });
+
+    if (!friendUser) {
+      res.status(404).json({ error: 'User not found' });
+      return;
+    }
+
+    // Проверяем дружбу
+    const friendship = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { userId, friendId, status: 'ACCEPTED' },
+          { userId: friendId, friendId: userId, status: 'ACCEPTED' }
+        ]
+      },
+      include: {
+        cloudStreak: true
+      }
+    });
+
+    const isFriend = !!friendship;
+    
+    // Формируем ответ
+    const friendProfile = {
+      ...friendUser,
+      isFriend,
+      friendshipDate: friendship?.createdAt || null,
+      cloudStreak: friendship?.cloudStreak?.currentStreak || 0,
+      longestCloudStreak: friendship?.cloudStreak?.longestStreak || 0,
+      lastCloudActivity: friendship?.cloudStreak?.lastActiveDate || null
+    };
+
+    res.json({ friend: friendProfile });
+
+  } catch (error) {
+    console.error('Get friend profile error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Поиск пользователей для добавления в друзья
  */
 export const searchUsers = async (req: AuthRequest, res: Response): Promise<void> => {
