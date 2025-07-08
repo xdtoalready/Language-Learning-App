@@ -113,7 +113,7 @@ export const CloudStreak: React.FC<CloudStreakProps> = ({
         <svg
           width={width}
           height={height}
-          viewBox="0 0 120 90"
+          viewBox="0 0 90 90"
           fill="none"
           xmlns="http://www.w3.org/2000/svg"
           className="drop-shadow-lg"
