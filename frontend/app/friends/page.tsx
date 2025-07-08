@@ -10,6 +10,7 @@ import {
   UsersIcon,
   PaperAirplaneIcon,
   CheckIcon,
+  UserIcon,
   XMarkIcon,
   ClockIcon,
   HeartIcon
@@ -399,11 +400,14 @@ export default function FriendsPage() {
 }
 
 // Компонент карточки друга с красивым облачком
-const FriendCard = ({ friend, onRemove, renderAvatar }: { 
+const FriendCard = ({ friend, onRemove, formatLastActive, renderAvatar }: { 
   friend: any; 
   onRemove: () => void;
+  formatLastActive: (date: string | Date | null) => string; // Добавили этот тип
   renderAvatar: (avatar: string | null, size?: string) => JSX.Element;
 }) => {
+  const router = useRouter(); // Добавьте эту строку
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
@@ -457,8 +461,7 @@ const FriendCard = ({ friend, onRemove, renderAvatar }: {
           variant="outline"
           size="sm"
           onClick={() => {
-            // Переход к профилю друга
-            window.location.href = `/friends/${friend.id}`;
+            router.push(`/friends/${friend.id}`);
           }}
           className="flex items-center gap-2"
         >
