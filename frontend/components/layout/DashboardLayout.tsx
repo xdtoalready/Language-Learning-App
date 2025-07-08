@@ -13,11 +13,13 @@ import {
   UserIcon,
   UsersIcon,
   Cog6ToothIcon,
-  ArrowRightOnRectangleIcon
+  ArrowRightOnRectangleIcon,
+  FireIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '@/store/useStore';
 import { Button } from '@/components/ui/Button';
+import { getStreakEmoji } from '@/lib/utils';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -56,6 +58,35 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
     logout();
     toast.success('Вы вышли из аккаунта');
     router.push('/auth');
+  };
+
+  // Функция для отображения аватара
+  const renderAvatar = (avatar: string | null, size: string = 'w-8 h-8') => {
+    if (!avatar) {
+      return (
+        <div className={`${size} bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-white text-sm font-bold`}>
+          {user?.username?.charAt(0).toUpperCase() || 'U'}
+        </div>
+      );
+    }
+
+    // Если аватар начинается с data: (base64 изображение)
+    if (avatar.startsWith('data:')) {
+      return (
+        <img 
+          src={avatar} 
+          alt="Avatar" 
+          className={`${size} rounded-full object-cover border-2 border-white shadow-sm`}
+        />
+      );
+    }
+
+    // Если аватар - эмодзи
+    return (
+      <div className={`${size} bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center text-lg`}>
+        {avatar}
+      </div>
+    );
   };
 
   // Показываем загрузку во время инициализации или если нет пользователя
@@ -127,15 +158,22 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
         {/* Профиль пользователя */}
         <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-gray-200 bg-white">
           <div className="flex items-center space-x-3 mb-3">
-            <div className="w-8 h-8 bg-gradient-to-r from-blue-400 to-purple-500 rounded-full flex items-center justify-center">
-              <span className="text-white text-sm font-medium">
-                {user.username?.[0]?.toUpperCase() || '?'}
-              </span>
-            </div>
+            {/* Аватар пользователя */}
+            {renderAvatar(user.avatar)}
+            
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900 truncate">
-                {user.username}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-900 truncate">
+                  {user.username}
+                </p>
+                {/* Мини-стрик */}
+                <div className="flex items-center gap-1 bg-orange-50 px-2 py-0.5 rounded-full">
+                  <FireIcon className="h-3 w-3 text-orange-500" />
+                  <span className="text-xs font-medium text-orange-700">
+                    {user.currentStreak || 0}
+                  </span>
+                </div>
+              </div>
               <p className="text-xs text-gray-500 truncate">
                 {user.email}
               </p>
