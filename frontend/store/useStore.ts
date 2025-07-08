@@ -417,7 +417,7 @@ export const useStore = create<AppStore>((set, get) => ({
   // Review actions
   startReviewSession: async () => {
     try {
-      const response = await apiClient.startReview();
+      const response = await apiClient.startReviewSession();
       set({
         isReviewSession: true,
         currentReviewWord: response.word || null,
@@ -429,22 +429,22 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
-  submitReview: async (wordId: string, rating: number) => {
+    submitReview: async (wordId: string, rating: number) => {
     try {
-      const response = await apiClient.submitReview(wordId, rating);
-      set({
-        currentReviewWord: response.nextWord || null,
-        hasMoreWords: response.hasMore,
-        remainingWords: response.remainingWords || 0
-      });
-      
-      // Обновляем статистику
-      await get().loadWordsStats();
-      await get().loadUserStats();
+        await apiClient.submitReview({ wordId, rating });
+        const nextWordResponse = await apiClient.startReviewSession();
+        
+        set({
+        currentReviewWord: nextWordResponse.word || null,
+        hasMoreWords: nextWordResponse.hasMore,
+        remainingWords: nextWordResponse.remaining || 0
+        });
+        
+        await get().loadWordsStats();
     } catch (error) {
-      throw error;
+        throw error;
     }
-  },
+    },
 
   endReviewSession: () => {
     set({
