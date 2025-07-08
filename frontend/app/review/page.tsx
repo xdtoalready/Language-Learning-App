@@ -289,8 +289,8 @@ export default function ReviewPage() {
                   {currentReviewWord.tags && currentReviewWord.tags.length > 0 && (
                     <div className="mb-6">
                       <div className="flex flex-wrap gap-2 justify-center">
-                        {currentReviewWord.tags.map(tag => (
-                          <Badge key={tag} variant="secondary">
+                        {currentReviewWord.tags.map((tag, tagIndex) => (
+                          <Badge key={`review-tag-${currentReviewWord.id}-${tagIndex}-${tag}`} variant="secondary">
                             {tag}
                           </Badge>
                         ))}
@@ -316,7 +316,7 @@ export default function ReviewPage() {
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         {RATING_OPTIONS.map((option) => (
                           <Button
-                            key={option.value}
+                            key={`rating-option-${option.value}-${option.label}`}
                             onClick={() => handleSubmitRating(option.value)}
                             className={`${option.color} text-white border-0 p-4 h-auto flex flex-col items-center`}
                           >

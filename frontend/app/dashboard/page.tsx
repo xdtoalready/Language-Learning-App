@@ -113,7 +113,7 @@ export default function DashboardPage() {
         >
           {quickStats.map((stat, index) => (
             <motion.div
-              key={stat.title}
+              key={`quick-stat-${index}-${stat.title}`}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3 + index * 0.1 }}
@@ -267,7 +267,7 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {dueWords.slice(0, 6).map((word, index) => (
                     <motion.div
-                      key={word.id}
+                      key={`due-word-${word.id}-${index}`}
                       initial={{ opacity: 0, scale: 0.9 }}
                       animate={{ opacity: 1, scale: 1 }}
                       transition={{ delay: 0.6 + index * 0.05 }}
@@ -286,13 +286,13 @@ export default function DashboardPage() {
                       </p>
                       {word.tags && word.tags.length > 0 && (
                         <div className="flex flex-wrap gap-1">
-                          {word.tags.slice(0, 2).map(tag => (
-                            <Badge key={tag} variant="outline" className="text-xs">
+                          {word.tags.slice(0, 2).map((tag, tagIndex) => (
+                            <Badge key={`due-word-tag-${word.id}-${tagIndex}-${tag}`} variant="outline" className="text-xs">
                               {tag}
                             </Badge>
                           ))}
                           {word.tags.length > 2 && (
-                            <Badge variant="outline" className="text-xs">
+                            <Badge key={`due-word-more-${word.id}`} variant="outline" className="text-xs">
                               +{word.tags.length - 2}
                             </Badge>
                           )}

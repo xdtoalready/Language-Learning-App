@@ -300,7 +300,7 @@ export default function StatsPage() {
                               dataKey="value"
                             >
                               {masteryData.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                <Cell key={`pie-cell-${index}-${entry.name}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
                             <Tooltip />
@@ -372,7 +372,7 @@ export default function StatsPage() {
                 <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     {/* Достижение: Первые слова */}
-                    <div className={`p-4 rounded-lg border-2 ${
+                    <div key="achievement-first-word" className={`p-4 rounded-lg border-2 ${
                       (user?.totalWordsLearned || 0) >= 1 
                         ? 'border-green-200 bg-green-50' 
                         : 'border-gray-200 bg-gray-50'
@@ -394,7 +394,7 @@ export default function StatsPage() {
                     </div>
 
                     {/* Достижение: Стрик */}
-                    <div className={`p-4 rounded-lg border-2 ${
+                    <div key="achievement-week-streak" className={`p-4 rounded-lg border-2 ${
                       (user?.currentStreak || 0) >= 7 
                         ? 'border-orange-200 bg-orange-50' 
                         : 'border-gray-200 bg-gray-50'
@@ -416,7 +416,7 @@ export default function StatsPage() {
                     </div>
 
                     {/* Достижение: Много слов */}
-                    <div className={`p-4 rounded-lg border-2 ${
+                    <div key="achievement-many-words" className={`p-4 rounded-lg border-2 ${
                       (user?.totalWordsLearned || 0) >= 100 
                         ? 'border-purple-200 bg-purple-50' 
                         : 'border-gray-200 bg-gray-50'

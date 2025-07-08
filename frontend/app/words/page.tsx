@@ -153,7 +153,7 @@ export default function WordsPage() {
           {MASTERY_LEVELS.slice(0, 3).map((level, index) => {
             const count = words.filter(word => word.masteryLevel === index).length;
             return (
-              <Card key={level.name}>
+              <Card key={`mastery-${index}-${level.name}`}>
                 <CardContent className="p-6">
                   <div className="flex items-center">
                     <div className={`w-3 h-3 rounded-full ${level.color}`}></div>
@@ -255,9 +255,9 @@ export default function WordsPage() {
                           Теги
                         </label>
                         <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto">
-                          {allTags.map(tag => (
+                          {allTags.map((tag, tagIndex) => (
                             <button
-                              key={tag}
+                              key={`tag-${tagIndex}-${tag}`}
                               onClick={() => toggleTag(tag)}
                               className={`px-3 py-1 rounded-full text-sm transition-colors ${
                                 selectedTags.includes(tag)
@@ -363,8 +363,8 @@ export default function WordsPage() {
 
                       <div className="flex items-center justify-between">
                         <div className="flex flex-wrap gap-1">
-                          {word.tags.map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-xs">
+                          {word.tags.map((tag, tagIndex) => (
+                            <Badge key={`word-tag-${word.id}-${tagIndex}-${tag}`} variant="secondary" className="text-xs">
                               {tag}
                             </Badge>
                           ))}

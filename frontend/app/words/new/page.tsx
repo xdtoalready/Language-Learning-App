@@ -213,7 +213,7 @@ export default function NewWordPage() {
                     <div className="flex flex-wrap gap-2 mb-3">
                       {formData.tags.map((tag, index) => (
                         <Badge
-                          key={index}
+                          key={`added-tag-${index}-${tag}`}
                           variant="primary"
                           className="cursor-pointer hover:bg-red-100 hover:text-red-800"
                           onClick={() => handleRemoveTag(tag)}
@@ -241,9 +241,9 @@ export default function NewWordPage() {
                       Популярные теги:
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {predefinedTags.map((tag) => (
+                      {predefinedTags.map((tag, tagIndex) => (
                         <Badge
-                          key={tag}
+                          key={`predefined-tag-${tagIndex}-${tag}`}
                           variant={formData.tags.includes(tag) ? 'default' : 'secondary'}
                           className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => {
