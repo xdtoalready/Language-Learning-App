@@ -193,6 +193,10 @@ export const login = async (req: Request, res: Response): Promise<void> => {
   }
 };
 
+interface AuthRequest extends Request {
+  userId?: string;
+}
+
 /**
  * Обновление профиля пользователя
  */
