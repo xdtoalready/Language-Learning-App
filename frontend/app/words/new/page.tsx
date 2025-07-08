@@ -214,17 +214,12 @@ export default function NewWordPage() {
                       {formData.tags.map((tag, index) => (
                         <Badge
                           key={index}
-                          variant="default"
-                          className="flex items-center gap-1"
+                          variant="primary"
+                          className="cursor-pointer hover:bg-red-100 hover:text-red-800"
+                          onClick={() => handleRemoveTag(tag)}
                         >
                           {tag}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveTag(tag)}
-                            className="ml-1 hover:text-red-600"
-                          >
-                            <XMarkIcon className="h-3 w-3" />
-                          </button>
+                          <XMarkIcon className="h-3 w-3 ml-1" />
                         </Badge>
                       ))}
                     </div>
@@ -232,22 +227,25 @@ export default function NewWordPage() {
 
                   {/* Поле ввода тега */}
                   <Input
-                    placeholder="Введите тег и нажмите Enter"
+                    type="text"
+                    placeholder="Добавьте тег (нажмите Enter или запятую)"
                     value={tagInput}
                     onChange={(e) => setTagInput(e.target.value)}
                     onKeyDown={handleAddTag}
-                    helperText="Используйте теги для категоризации слов (например: глагол, формальное, из книги)"
+                    helperText="Используйте теги для группировки слов по темам"
                   />
 
-                  {/* Предустановленные теги */}
+                  {/* Готовые теги */}
                   <div className="mt-3">
-                    <p className="text-sm text-gray-600 mb-2">Популярные теги:</p>
+                    <p className="text-sm font-medium text-gray-700 mb-2">
+                      Популярные теги:
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {predefinedTags.map((tag) => (
                         <Badge
                           key={tag}
                           variant={formData.tags.includes(tag) ? 'default' : 'secondary'}
-                          className="cursor-pointer hover:bg-blue-100"
+                          className="cursor-pointer hover:bg-blue-100 transition-colors"
                           onClick={() => {
                             if (!formData.tags.includes(tag)) {
                               setFormData({
@@ -269,7 +267,7 @@ export default function NewWordPage() {
                 <div className="flex flex-col sm:flex-row gap-3 pt-6 border-t border-gray-200">
                   <Button
                     type="submit"
-                    loading={isSubmitting}
+                    isLoading={isSubmitting}
                     disabled={!formData.word.trim() || !formData.translation.trim()}
                     className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     size="lg"

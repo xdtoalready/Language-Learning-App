@@ -2,63 +2,70 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'react-hot-toast';
 import {
-  EyeIcon,
   ArrowLeftIcon,
   HomeIcon,
-  CheckCircleIcon
+  EyeIcon,
+  EyeSlashIcon
 } from '@heroicons/react/24/outline';
-import { useReview } from '@/store/useStore';
+import { useRouter } from 'next/navigation';
+import { toast } from 'react-hot-toast';
+import { useReview, useAuth } from '@/store/useStore';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
-import { getRatingText, getRatingEmoji, getMasteryLevelName } from '@/lib/utils';
+
+const RATING_OPTIONS = [
+  { value: 1, label: 'Сложно', emoji: '😫', color: 'bg-red-500 hover:bg-red-600', description: 'Не помню' },
+  { value: 2, label: 'Трудно', emoji: '😐', color: 'bg-orange-500 hover:bg-orange-600', description: 'С трудом' },
+  { value: 3, label: 'Хорошо', emoji: '😊', color: 'bg-blue-500 hover:bg-blue-600', description: 'Помню' },
+  { value: 4, label: 'Легко', emoji: '😎', color: 'bg-green-500 hover:bg-green-600', description: 'Легко' }
+];
 
 export default function ReviewPage() {
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showTranslation, setShowTranslation] = useState(false);
   const [sessionStats, setSessionStats] = useState({
     total: 0,
     correct: 0,
     ratings: { 1: 0, 2: 0, 3: 0, 4: 0 }
   });
 
-  const {
-    isReviewSession,
-    currentReviewWord,
-    hasMoreWords,
+  const { 
+    isReviewSession, 
+    currentReviewWord, 
+    hasMoreWords, 
     remainingWords,
     startReviewSession,
-    submitReview,
-    endReviewSession
+    submitReview, 
+    endReviewSession 
   } = useReview();
-
+  
+  const { isAuthenticated } = useAuth();
   const router = useRouter();
 
+  // Инициализация сессии, если она не активна
   useEffect(() => {
-    if (!isReviewSession || !currentReviewWord) {
-      startReviewSession().catch(() => {
-        toast.error('Нет слов для повторения');
+    if (!isAuthenticated) {
+      router.push('/auth');
+      return;
+    }
+
+    if (!isReviewSession && !currentReviewWord) {
+      console.log('🔄 ReviewPage: Запуск сессии ревью...');
+      startReviewSession().catch((error) => {
+        console.error('Ошибка запуска сессии ревью:', error);
+        toast.error('Не удалось запустить сессию повторения');
         router.push('/dashboard');
       });
     }
-  }, [isReviewSession, currentReviewWord, startReviewSession, router]);
+  }, [isAuthenticated, isReviewSession, currentReviewWord, startReviewSession, router]);
 
-  const handleShowAnswer = () => {
-    setShowAnswer(true);
-  };
+  const handleSubmitRating = async (rating: number) => {
+    if (!currentReviewWord) return;
 
-  const handleRating = async (rating: number) => {
-    if (!currentReviewWord || isSubmitting) return;
-
-    setIsSubmitting(true);
     try {
-      await submitReview(currentReviewWord.id, rating);
-      
       // Обновляем статистику сессии
       setSessionStats(prev => ({
         total: prev.total + 1,
@@ -69,20 +76,12 @@ export default function ReviewPage() {
         }
       }));
 
-      // Сбрасываем состояние для следующего слова
-      setShowAnswer(false);
+      await submitReview(currentReviewWord.id, rating);
+      setShowTranslation(false);
       
-      // Показываем результат
-      if (rating >= 3) {
-        toast.success(`${getRatingEmoji(rating)} ${getRatingText(rating)}!`);
-      } else {
-        toast.error(`${getRatingEmoji(rating)} ${getRatingText(rating)}`);
-      }
-
     } catch (error) {
-      toast.error('Ошибка при отправке результата');
-    } finally {
-      setIsSubmitting(false);
+      console.error('Ошибка отправки оценки:', error);
+      toast.error('Ошибка при сохранении результата');
     }
   };
 
@@ -91,23 +90,35 @@ export default function ReviewPage() {
     router.push('/dashboard');
   };
 
-  // Если нет слов для повторения
-  if (!currentReviewWord && !hasMoreWords) {
+  const getRatingEmoji = (rating: number) => {
+    const option = RATING_OPTIONS.find(opt => opt.value === rating);
+    return option ? option.emoji : '😐';
+  };
+
+  // Проверка авторизации
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-blue-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Перенаправление...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Экран завершения сессии
+  if (!isReviewSession || (!currentReviewWord && !hasMoreWords)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
         <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", stiffness: 200 }}
-          className="text-center"
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          className="max-w-md w-full"
         >
-          <Card className="p-8 max-w-md mx-auto">
-            <CardContent>
-              <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <CheckCircleIcon className="h-10 w-10 text-green-600" />
-              </div>
-              <h1 className="text-2xl font-bold text-gray-900 mb-4">
-                Отлично! 🎉
+          <Card>
+            <CardContent className="p-8 text-center">
+              <h1 className="text-2xl font-bold text-gray-900 mb-2">
+                Сессия завершена! 🎉
               </h1>
               <p className="text-gray-600 mb-6">
                 Вы завершили сессию повторения!
@@ -151,10 +162,14 @@ export default function ReviewPage() {
     );
   }
 
+  // Загрузка
   if (!currentReviewWord) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="text-center space-y-4">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-gray-600">Подготовка слова для повторения...</p>
+        </div>
       </div>
     );
   }
@@ -212,122 +227,128 @@ export default function ReviewPage() {
               exit={{ opacity: 0, x: -50 }}
               transition={{ duration: 0.3 }}
             >
-              {/* Карточка со словом */}
-              <Card className="mb-8 shadow-lg border-0 bg-white/80 backdrop-blur-sm">
+              <Card className="mb-8">
                 <CardContent className="p-8 text-center">
-                  {/* Информация о слове */}
-                  <div className="mb-6">
-                    <Badge variant="secondary" className="mb-4">
-                      {getMasteryLevelName(currentReviewWord.masteryLevel)}
-                    </Badge>
-                    {currentReviewWord.tags.length > 0 && (
-                      <div className="flex flex-wrap justify-center gap-2 mb-4">
-                        {currentReviewWord.tags.map((tag, index) => (
-                          <Badge key={index} variant="default" size="sm">
-                            {tag}
-                          </Badge>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
                   {/* Слово */}
-                  <motion.div
-                    initial={{ scale: 0.9 }}
-                    animate={{ scale: 1 }}
-                    transition={{ delay: 0.1 }}
-                    className="mb-8"
-                  >
-                    <h2 className="text-5xl font-bold text-gray-900 mb-4">
+                  <div className="mb-6">
+                    <h2 className="text-4xl font-bold text-gray-900 mb-2">
                       {currentReviewWord.word}
                     </h2>
                     {currentReviewWord.transcription && (
-                      <p className="text-xl text-gray-600 italic">
+                      <p className="text-lg text-gray-600">
                         [{currentReviewWord.transcription}]
                       </p>
                     )}
-                  </motion.div>
+                  </div>
 
-                  {/* Ответ */}
+                  {/* Кнопка показать/скрыть перевод */}
+                  <div className="mb-6">
+                    <Button
+                      onClick={() => setShowTranslation(!showTranslation)}
+                      variant="outline"
+                      className="flex items-center mx-auto"
+                    >
+                      {showTranslation ? (
+                        <>
+                          <EyeSlashIcon className="h-4 w-4 mr-2" />
+                          Скрыть перевод
+                        </>
+                      ) : (
+                        <>
+                          <EyeIcon className="h-4 w-4 mr-2" />
+                          Показать перевод
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* Перевод */}
                   <AnimatePresence>
-                    {showAnswer ? (
+                    {showTranslation && (
                       <motion.div
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -20 }}
-                        transition={{ duration: 0.3 }}
-                        className="space-y-4"
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="mb-6"
                       >
-                        <div className="p-6 bg-blue-50 rounded-xl border border-blue-200">
-                          <h3 className="text-2xl font-semibold text-blue-900 mb-2">
+                        <div className="p-4 bg-blue-50 rounded-lg">
+                          <p className="text-xl font-medium text-gray-900 mb-2">
                             {currentReviewWord.translation}
-                          </h3>
+                          </p>
                           {currentReviewWord.example && (
-                            <p className="text-blue-700 italic">
+                            <p className="text-gray-700 italic">
                               {currentReviewWord.example}
                             </p>
                           )}
                         </div>
-
-                        {/* Кнопки оценки */}
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mt-8">
-                          {[
-                            { rating: 1, text: 'Забыл', color: 'bg-red-500 hover:bg-red-600' },
-                            { rating: 2, text: 'С трудом', color: 'bg-orange-500 hover:bg-orange-600' },
-                            { rating: 3, text: 'Хорошо', color: 'bg-blue-500 hover:bg-blue-600' },
-                            { rating: 4, text: 'Отлично', color: 'bg-green-500 hover:bg-green-600' }
-                          ].map((option) => (
-                            <Button
-                              key={option.rating}
-                              onClick={() => handleRating(option.rating)}
-                              disabled={isSubmitting}
-                              className={`${option.color} text-white border-0 py-4 text-center transition-all hover:scale-105`}
-                            >
-                              <div>
-                                <div className="text-2xl mb-1">
-                                  {getRatingEmoji(option.rating)}
-                                </div>
-                                <div className="text-sm font-medium">
-                                  {option.text}
-                                </div>
-                              </div>
-                            </Button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    ) : (
-                      <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                      >
-                        <Button
-                          onClick={handleShowAnswer}
-                          size="lg"
-                          className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-8 py-4"
-                        >
-                          <EyeIcon className="h-5 w-5 mr-2" />
-                          Показать ответ
-                        </Button>
                       </motion.div>
                     )}
                   </AnimatePresence>
+
+                  {/* Теги */}
+                  {currentReviewWord.tags && currentReviewWord.tags.length > 0 && (
+                    <div className="mb-6">
+                      <div className="flex flex-wrap gap-2 justify-center">
+                        {currentReviewWord.tags.map(tag => (
+                          <Badge key={tag} variant="secondary">
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Подсказка */}
-              {!showAnswer && (
+              {/* Кнопки оценки */}
+              {showTranslation && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.5 }}
-                  className="text-center text-gray-500 text-sm"
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2 }}
                 >
-                  💡 Сначала попробуйте вспомнить перевод, затем нажмите "Показать ответ"
+                  <Card>
+                    <CardContent className="p-6">
+                      <h3 className="text-lg font-medium text-gray-900 text-center mb-4">
+                        Насколько хорошо вы помните это слово?
+                      </h3>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                        {RATING_OPTIONS.map((option) => (
+                          <Button
+                            key={option.value}
+                            onClick={() => handleSubmitRating(option.value)}
+                            className={`${option.color} text-white border-0 p-4 h-auto flex flex-col items-center`}
+                          >
+                            <span className="text-2xl mb-1">{option.emoji}</span>
+                            <span className="font-medium">{option.label}</span>
+                            <span className="text-xs opacity-90">{option.description}</span>
+                          </Button>
+                        ))}
+                      </div>
+                      
+                      <p className="text-center text-sm text-gray-600 mt-4">
+                        Выберите, насколько легко вам далось это слово
+                      </p>
+                    </CardContent>
+                  </Card>
                 </motion.div>
               )}
             </motion.div>
           </AnimatePresence>
+
+          {/* Подсказка, если перевод не показан */}
+          {!showTranslation && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="text-center"
+            >
+              <p className="text-gray-600">
+                Попробуйте вспомнить перевод, затем проверьте себя
+              </p>
+            </motion.div>
+          )}
         </div>
       </div>
     </div>
