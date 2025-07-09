@@ -42,10 +42,10 @@ describe('Input Evaluation System', () => {
         expect(result.similarity).toBeGreaterThan(0.8);
       });
 
-      test('should detect multiple typos', () => {
-        const result = evaluateInput('превт', 'привет'); // и → е, missing е
-        expect(result.score).toBe(3);
-        expect(result.reason).toBe('typo');
+      test('should reject too many typos as wrong', () => {
+        const result = evaluateInput('превт', 'привет'); // и → е, missing е - слишком много ошибок
+        expect(result.score).toBe(1);
+        expect(result.reason).toBe('wrong');
       });
 
       test('should not accept too many typos', () => {
