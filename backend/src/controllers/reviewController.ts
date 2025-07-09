@@ -129,6 +129,9 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
         session: null,
         currentWord: null,
         hasMore: false,
+        hasMoreWords: false, // ✅ Добавляем альтернативное название
+        remaining: 0,
+        remainingWords: 0, // ✅ Добавляем альтернативное название
         message: sessionType === 'daily' 
           ? 'No words due for review today' 
           : 'No words found for training'
@@ -144,41 +147,41 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
 
     if (mode === 'TRANSLATION_INPUT') {
       // Двураундовая сессия: сначала с изучаемого на родной, потом наоборот
-        const round1Words = words.map(word => ({
+      const round1Words = words.map(word => ({
         ...word,
         transcription: word.transcription || undefined,
         example: word.example || undefined,
         direction: 'LEARNING_TO_NATIVE' as ReviewDirection,
         isCompleted: false
-        }));
+      }));
       
-        const round2Words = words.map(word => ({
+      const round2Words = words.map(word => ({
         ...word,
         transcription: word.transcription || undefined,
         example: word.example || undefined,
         direction: 'NATIVE_TO_LEARNING' as ReviewDirection,
         isCompleted: false
-        }));
+      }));
       
       sessionWords = [...round1Words, ...round2Words];
     } else if (mode === 'REVERSE_INPUT') {
       // Только обратное направление: с родного на изучаемый
-        sessionWords = words.map(word => ({
+      sessionWords = words.map(word => ({
         ...word,
         transcription: word.transcription || undefined,
         example: word.example || undefined,
         direction: 'NATIVE_TO_LEARNING' as ReviewDirection,
         isCompleted: false
-        }));
+      }));
     } else {
       // RECOGNITION или MIXED: стандартное направление
-        sessionWords = words.map(word => ({
+      sessionWords = words.map(word => ({
         ...word,
         transcription: word.transcription || undefined,
         example: word.example || undefined,
         direction: 'LEARNING_TO_NATIVE' as ReviewDirection,
         isCompleted: false
-        }));
+      }));
     }
 
     // Сохраняем сессию
@@ -202,6 +205,8 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
 
     // Возвращаем первое слово
     const currentWord = sessionWords[0];
+    const remainingCount = sessionWords.length - 1; // слов осталось после первого
+    const hasMoreWords = sessionWords.length > 1;
     
     res.json({
       session: {
@@ -214,8 +219,10 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
         startTime: new Date().toISOString()
       },
       currentWord,
-      hasMore: sessionWords.length > 1,
-      remaining: sessionWords.length - 1
+      hasMore: hasMoreWords,
+      hasMoreWords: hasMoreWords,
+      remaining: remainingCount,
+      remainingWords: remainingCount
     });
 
   } catch (error) {
@@ -245,16 +252,25 @@ export const getCurrentWord = async (req: AuthRequest, res: Response): Promise<v
       res.json({
         currentWord: null,
         hasMore: false,
+        hasMoreWords: false,
+        remaining: 0,
+        remainingWords: 0,
         completed: true,
         sessionStats: session.stats
       });
       return;
     }
 
+    const hasMoreWords = session.currentWordIndex < session.words.length - 1;
+    const remainingCount = session.words.length - session.currentWordIndex - 1;
+
     res.json({
       currentWord,
-      hasMore: session.currentWordIndex < session.words.length - 1,
-      remaining: session.words.length - session.currentWordIndex - 1,
+      // ✅ Возвращаем ОБА варианта названий для совместимости
+      hasMore: hasMoreWords,
+      hasMoreWords: hasMoreWords,
+      remaining: remainingCount,
+      remainingWords: remainingCount,
       sessionInfo: {
         sessionId,
         mode: session.mode,
@@ -270,7 +286,7 @@ export const getCurrentWord = async (req: AuthRequest, res: Response): Promise<v
 };
 
 /**
- * Отправить ревью (новая версия с поддержкой всех режимов)
+ * Отправить ревью
  */
 export const submitReview = async (req: AuthRequest, res: Response): Promise<void> => {
   try {
@@ -340,7 +356,7 @@ export const submitReview = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     // Обновляем слово в базе данных только для ежедневных сессий
-    if (session.sessionType === 'daily') {
+if (session.sessionType === 'daily') {
       // Рассчитываем новые параметры через алгоритм интервального повторения
       const updatedParams = updateWordAfterReview({
         wordId,
@@ -438,26 +454,30 @@ export const submitReview = async (req: AuthRequest, res: Response): Promise<voi
       ? session.words[session.currentWordIndex] 
       : null;
 
-    const hasMore = nextWord !== null;
+    const hasMoreWords = nextWord !== null;
+    const remainingCount = hasMoreWords ? session.words.length - session.currentWordIndex : 0;
 
     // Если сессия завершена, удаляем её
-    if (!hasMore) {
+    if (!hasMoreWords) {
       activeSessions.delete(sessionId);
     }
 
     res.json({
-    success: true,
-    evaluation: autoEvaluated ? {
+      success: true,
+      evaluation: autoEvaluated ? {
         score: finalRating,
         autoEvaluated: true,
         userInput,
         correctAnswer: direction === 'LEARNING_TO_NATIVE' ? word.translation : word.word
-    } : undefined,
-    currentWord: nextWord,
-    hasMore,
-    remaining: hasMore ? session.words.length - session.currentWordIndex : 0,
-    sessionStats: session.stats,
-    completed: !hasMore
+      } : undefined,
+      currentWord: nextWord,
+      hasMore: hasMoreWords,
+      hasMoreWords: hasMoreWords,
+      remaining: remainingCount,
+      remainingWords: remainingCount,
+      sessionStats: session.stats,
+      completed: !hasMoreWords,
+      currentRound: session.currentRound
     });
 
   } catch (error) {

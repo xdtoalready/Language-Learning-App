@@ -415,7 +415,7 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
-  createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training', filters?: any) => {
+createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training', filters?: any) => {
   try {
     console.log('🔄 Создание сессии ревью:', { mode, sessionType, filters });
     
@@ -431,14 +431,19 @@ export const useStore = create<AppStore>((set, get) => ({
       reviewMode: mode,
       currentDirection: response.currentWord?.direction || 'LEARNING_TO_NATIVE',
       hintsUsed: 0,
-      currentRound: 1,
+      currentRound: response.session?.currentRound || 1,
       isReviewSession: true,
       currentReviewWord: response.currentWord,
-      hasMoreWords: response.hasMoreWords,
-      remainingWords: response.remainingWords
+      hasMoreWords: response.hasMoreWords || response.hasMore || false,
+      remainingWords: response.remainingWords ?? response.remaining ?? 0
     });
     
-    console.log('✅ Сессия создана:', response.session.sessionId);
+    console.log('✅ Сессия создана:', {
+      sessionId: response.session?.sessionId,
+      currentWord: response.currentWord?.word,
+      remainingWords: response.remainingWords ?? response.remaining ?? 0,
+      hasMoreWords: response.hasMoreWords || response.hasMore || false
+    });
   } catch (error) {
     console.error('❌ Ошибка создания сессии:', error);
     throw error;
@@ -471,10 +476,9 @@ submitReviewInSession: async (data: {
     
     console.log('🔄 Полный ответ от API:', response);
     
-    // Обрабатываем разные варианты названий полей
-    const nextWord = response.currentWord || response.nextWord || null;
-    const hasMore = response.hasMore ?? response.hasMoreWords ?? false;
-    const remaining = response.remaining ?? response.remainingWords ?? 0;
+    const nextWord = response.currentWord;
+    const hasMore = response.hasMoreWords || response.hasMore || false;
+    const remaining = response.remainingWords ?? response.remaining ?? 0;
     
     console.log('📊 Обработанные данные:', {
       nextWord: nextWord?.word || 'null',
@@ -493,7 +497,7 @@ submitReviewInSession: async (data: {
       currentDirection: nextWord?.direction || state.currentDirection
     });
     
-    console.log('✅ Ревью отправлено, следующее слово:', nextWord?.word || 'null');
+    console.log('✅ Ревью отправлено, следующее слово:', nextWord?.word || 'завершено');
     
     // Если сессия завершена
     if (!hasMore) {
