@@ -80,11 +80,14 @@ export function ReviewModeSelector({
   const [selectedMode, setSelectedMode] = useState<ReviewMode | null>(null);
   const router = useRouter();
 
-  const handleModeSelect = (mode: ReviewMode) => {
+const handleModeSelect = (mode: ReviewMode) => {
+    console.log('Clicked mode:', mode);
     if (!REVIEW_MODES.find(m => m.id === mode)?.isAvailable) {
+      console.log('Mode is not available, returning.');
       return;
     }
     setSelectedMode(mode);
+    console.log('Selected mode updated to:', mode);
   };
 
   const handleStart = () => {
