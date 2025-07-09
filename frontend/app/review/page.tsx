@@ -1,8 +1,6 @@
-// frontend/app/review/page.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ
-
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
@@ -35,10 +33,6 @@ export default function ReviewPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   
-  // ✅ ИСПРАВЛЕНО: Добавляем ref для предотвращения дублирования
-  const isCreatingSessionRef = useRef(false);
-  const lastSessionIdRef = useRef<string | null>(null);
-  
   const { 
     currentSession,
     sessionType,
@@ -68,56 +62,31 @@ export default function ReviewPage() {
   const urlSessionType = searchParams.get('sessionType') as 'daily' | 'training' || 'daily';
   const urlMode = searchParams.get('mode') as ReviewMode || 'RECOGNITION';
 
-  // ✅ ИСПРАВЛЕНО: Инициализация сессии с защитой от дублирования
-  useEffect(() => {
+  // Инициализация сессии
+    useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/auth');
-      return;
+        router.push('/auth');
+        return;
     }
 
-    const hasUrlParams = searchParams.get('sessionType') || searchParams.get('mode');
-    const needsNewSession = !isReviewSession && !currentSession && hasUrlParams;
-    
-    // Проверяем что у нас уже есть сессия с правильным ID
-    const currentSessionId = currentSession?.sessionId;
-    if (currentSessionId && lastSessionIdRef.current === currentSessionId) {
-      console.log('🔄 Сессия уже создана и активна:', currentSessionId);
-      return;
-    }
-
-    if (needsNewSession && !isCreatingSessionRef.current) {
-      console.log('🔄 ReviewPage: Создание новой сессии...', {
+    // Создаем сессию только если её нет И нет текущей сессии
+    if (!isReviewSession && !currentSession && (searchParams.get('sessionType') || searchParams.get('mode'))) {
+        console.log('🔄 ReviewPage: Создание новой сессии...', {
         sessionType: urlSessionType,
         mode: urlMode,
-        isCreating: isCreatingSessionRef.current,
         hasCurrentSession: !!currentSession,
         isReviewSession
-      });
-
-      // Устанавливаем флаг что сессия создается
-      isCreatingSessionRef.current = true;
-      
-      createReviewSession(urlMode, urlSessionType)
-        .then((response) => {
-          console.log('✅ Сессия успешно создана');
-          lastSessionIdRef.current = response?.session?.sessionId || null;
-        })
-        .catch((error) => {
-          console.error('❌ Ошибка создания сессии:', error);
-          toast.error('Не удалось создать сессию повторения');
-          router.push('/dashboard');
-        })
-        .finally(() => {
-          // Сбрасываем флаг через небольшую задержку
-          setTimeout(() => {
-            isCreatingSessionRef.current = false;
-          }, 1000);
+        });
+        
+        createReviewSession(urlMode, urlSessionType).catch((error) => {
+        console.error('Ошибка создания сессии:', error);
+        toast.error('Не удалось создать сессию повторения');
+        router.push('/dashboard');
         });
     }
-  }, [isAuthenticated, isReviewSession, currentSession, urlSessionType, urlMode, createReviewSession, router, searchParams]);
+    }, [isAuthenticated, isReviewSession, currentSession, urlSessionType, urlMode, createReviewSession, router, searchParams]);
 
-  // ✅ ИСПРАВЛЕНО: Дополнительная проверка сессии перед отправкой
-  const validateSession = () => {
+ const validateSession = () => {
     if (!currentSession) {
       console.error('❌ Нет активной сессии');
       toast.error('Сессия не найдена. Перенаправляем на главную.');
@@ -140,9 +109,10 @@ export default function ReviewPage() {
     return true;
   };
 
+
   // Обработка оценки для режима Recognition
   const handleSubmitRating = async (rating: number) => {
-    if (!validateSession()) return;
+    if (!currentReviewWord || !currentSession) return;
 
     try {
       setSessionStats(prev => ({
@@ -155,7 +125,7 @@ export default function ReviewPage() {
       }));
 
       await submitReviewInSession({
-        wordId: currentReviewWord!.id,
+        wordId: currentReviewWord.id,
         rating,
         reviewMode: 'RECOGNITION',
         direction: currentDirection,
@@ -165,13 +135,13 @@ export default function ReviewPage() {
       setShowTranslation(false);
       
     } catch (error) {
-      console.error('❌ Ошибка отправки оценки:', error);
+      console.error('Ошибка отправки оценки:', error);
       toast.error('Ошибка при сохранении результата');
     }
   };
 
-  // ✅ ИСПРАВЛЕНО: Обработка ввода с валидацией сессии
-  const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
+  // Обработка ввода для режимов Translation/Reverse
+const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
     if (!validateSession()) return;
 
     try {
@@ -219,15 +189,15 @@ export default function ReviewPage() {
     }
   };
 
+
   // Завершение сессии
   const handleEndSession = async () => {
     try {
       if (currentSession) {
-        console.log('🏁 Завершение сессии:', currentSession.sessionId);
         await endSessionNew();
       }
     } catch (error) {
-      console.error('❌ Ошибка завершения сессии:', error);
+      console.error('Ошибка завершения сессии:', error);
     } finally {
       router.push('/dashboard');
     }
@@ -242,8 +212,8 @@ export default function ReviewPage() {
       : currentReviewWord.translation;
   };
 
-  // Получение правильного ответа для режимов ввода
-  const getCorrectAnswer = () => {
+  // Получение ожидаемого ответа
+  const getExpectedAnswer = () => {
     if (!currentReviewWord) return '';
     
     return currentDirection === 'LEARNING_TO_NATIVE' 
@@ -251,19 +221,57 @@ export default function ReviewPage() {
       : currentReviewWord.word;
   };
 
-  // Если сессия завершена, показываем результаты
-  if (isReviewSession && !hasMoreWords && !currentReviewWord) {
+  // Получение иконки режима
+  const getModeIcon = () => {
+    switch (reviewMode) {
+      case 'RECOGNITION':
+        return EyeIcon;
+      case 'TRANSLATION_INPUT':
+        return PencilIcon;
+      case 'REVERSE_INPUT':
+        return ArrowsRightLeftIcon;
+      default:
+        return EyeIcon;
+    }
+  };
+
+  const getModeTitle = () => {
+    switch (reviewMode) {
+      case 'RECOGNITION':
+        return 'Узнавание';
+      case 'TRANSLATION_INPUT':
+        return 'Ввод перевода';
+      case 'REVERSE_INPUT':
+        return 'Обратный ввод';
+      default:
+        return 'Повторение';
+    }
+  };
+
+  // Проверка авторизации
+  if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <p className="text-gray-600">Перенаправление...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Экран завершения сессии
+  if (!isReviewSession || (!currentReviewWord && !hasMoreWords)) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="w-full max-w-md"
+          className="max-w-md w-full"
         >
-          <Card className="text-center">
-            <CardContent className="p-8">
+          <Card>
+            <CardContent className="p-8 text-center">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Поздравляем! 🎉
+                Сессия завершена! 🎉
               </h1>
               <p className="text-gray-600 mb-6">
                 Вы завершили сессию {sessionType === 'daily' ? 'повторения' : 'тренировки'}!
@@ -319,14 +327,16 @@ export default function ReviewPage() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">
-            {isCreatingSessionRef.current ? 'Создание сессии...' : 'Подготовка слова для повторения...'}
-          </p>
+          <p className="text-gray-600">Подготовка слова для повторения...</p>
         </div>
       </div>
     );
   }
 
+    const totalWords = currentSession?.totalWords || 0;
+    const completedWords = totalWords - (remainingWords || 0);
+    const progressPercentage = totalWords > 0 ? Math.round((completedWords / totalWords) * 100) : 0;
+  const ModeIcon = getModeIcon();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
