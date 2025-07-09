@@ -50,7 +50,7 @@ class ApiTester {
       return { status: response.status, data, time };
     } catch (error) {
       const time = Date.now() - startTime;
-      return { status: 0, data: { error: error.message }, time };
+      return { status: 0, data: { error: error instanceof Error ? error.message : String(error) }, time };
     }
   }
 
