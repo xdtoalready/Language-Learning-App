@@ -135,6 +135,12 @@ export const useStore = create<AppStore>((set, get) => ({
   currentReviewWord: null,
   hasMoreWords: false,
   remainingWords: 0,
+  currentSession: null,
+  sessionType: 'daily',
+  reviewMode: 'RECOGNITION',
+  currentDirection: 'LEARNING_TO_NATIVE',
+  hintsUsed: 0,
+  currentRound: 1,
   friends: [],
   pendingRequests: [],
   isLoadingFriends: false,
@@ -414,6 +420,167 @@ export const useStore = create<AppStore>((set, get) => ({
     }
   },
 
+  createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training', filters?: any) => {
+  try {
+    console.log('🔄 Создание сессии ревью:', { mode, sessionType, filters });
+    
+    const response = await apiClient.createReviewSession({
+      mode,
+      sessionType,
+      filterBy: filters
+    });
+    
+    set({ 
+      currentSession: response.session,
+      sessionType,
+      reviewMode: mode,
+      currentDirection: response.currentWord?.direction || 'LEARNING_TO_NATIVE',
+      hintsUsed: 0,
+      currentRound: 1,
+      isReviewSession: true,
+      currentReviewWord: response.currentWord,
+      hasMoreWords: response.hasMoreWords,
+      remainingWords: response.remainingWords
+    });
+    
+    console.log('✅ Сессия создана:', response.session.sessionId);
+  } catch (error) {
+    console.error('❌ Ошибка создания сессии:', error);
+    throw error;
+  }
+},
+
+submitReviewInSession: async (data: {
+  wordId: string;
+  rating?: number;
+  userInput?: string;
+  hintsUsed?: number;
+  timeSpent?: number;
+  reviewMode?: ReviewMode;
+  direction?: ReviewDirection;
+}) => {
+  try {
+    const state = get();
+    if (!state.currentSession) {
+      throw new Error('Нет активной сессии');
+    }
+    
+    console.log('📝 Отправка ревью в сессии:', data);
+    
+    const response = await apiClient.submitReviewInSession(state.currentSession.sessionId, {
+      ...data,
+      hintsUsed: data.hintsUsed || state.hintsUsed,
+      reviewMode: data.reviewMode || state.reviewMode,
+      direction: data.direction || state.currentDirection
+    });
+    
+    // Обновляем состояние
+    set({
+      currentReviewWord: response.currentWord,
+      hasMoreWords: response.hasMoreWords,
+      remainingWords: response.remainingWords,
+      hintsUsed: 0, // сброс для следующего слова
+      currentRound: response.currentRound || 1,
+      currentDirection: response.currentWord?.direction || state.currentDirection
+    });
+    
+    console.log('✅ Ревью отправлено, следующее слово:', response.currentWord?.word);
+    
+    // Если сессия завершена
+    if (!response.hasMoreWords) {
+      set({ 
+        isReviewSession: false,
+        currentSession: null,
+        currentReviewWord: null 
+      });
+    }
+  } catch (error) {
+    console.error('❌ Ошибка отправки ревью:', error);
+    throw error;
+  }
+},
+
+getHint: async (wordId: string, hintType: 'length' | 'first_letter') => {
+  try {
+    const state = get();
+    
+    const response = await apiClient.getHint({
+      wordId,
+      hintType,
+      currentHintsUsed: state.hintsUsed,
+      direction: state.currentDirection
+    });
+    
+    // Увеличиваем счетчик подсказок
+    set({ hintsUsed: state.hintsUsed + 1 });
+    
+    console.log('💡 Подсказка получена:', response.hint);
+    return response.hint;
+  } catch (error) {
+    console.error('❌ Ошибка получения подсказки:', error);
+    throw error;
+  }
+},
+
+getTrainingWords: async (filters?: {
+  tags?: string[];
+  masteryLevels?: number[];
+  limit?: number;
+}) => {
+  try {
+    console.log('🏋️ Загрузка тренировочных слов:', filters);
+    
+    const params: any = {};
+    if (filters?.tags?.length) {
+      params.tags = filters.tags.join(',');
+    }
+    if (filters?.masteryLevels?.length) {
+      params.masteryLevel = filters.masteryLevels.join(',');
+    }
+    if (filters?.limit) {
+      params.limit = filters.limit;
+    }
+    
+    const response = await apiClient.getTrainingWords(params);
+    
+    console.log('✅ Тренировочные слова загружены:', response.words.length);
+    return response.words;
+  } catch (error) {
+    console.error('❌ Ошибка загрузки тренировочных слов:', error);
+    throw error;
+  }
+},
+
+endSessionNew: async () => {
+  try {
+    const state = get();
+    if (!state.currentSession) {
+      console.warn('⚠️ Нет активной сессии для завершения');
+      return;
+    }
+    
+    console.log('🏁 Завершение сессии:', state.currentSession.sessionId);
+    
+    const response = await apiClient.endSession(state.currentSession.sessionId);
+    
+    set({
+      isReviewSession: false,
+      currentSession: null,
+      currentReviewWord: null,
+      hasMoreWords: false,
+      remainingWords: 0,
+      hintsUsed: 0,
+      currentRound: 1
+    });
+    
+    console.log('✅ Сессия завершена:', response.sessionStats);
+    return response.sessionStats;
+  } catch (error) {
+    console.error('❌ Ошибка завершения сессии:', error);
+    throw error;
+  }
+},
+
   // Review actions
   startReviewSession: async () => {
     try {
@@ -610,6 +777,20 @@ export const useReview = () => useStore((state) => ({
   currentReviewWord: state.currentReviewWord,
   hasMoreWords: state.hasMoreWords,
   remainingWords: state.remainingWords,
+  // Новые поля:
+  currentSession: state.currentSession,
+  sessionType: state.sessionType,
+  reviewMode: state.reviewMode,
+  currentDirection: state.currentDirection,
+  hintsUsed: state.hintsUsed,
+  currentRound: state.currentRound,
+  // Новые методы:
+  createReviewSession: state.createReviewSession,
+  submitReviewInSession: state.submitReviewInSession,
+  getHint: state.getHint,
+  getTrainingWords: state.getTrainingWords,
+  endSessionNew: state.endSessionNew,
+  // Старые методы (для совместимости):
   startReviewSession: state.startReviewSession,
   submitReview: state.submitReview,
   endReviewSession: state.endReviewSession

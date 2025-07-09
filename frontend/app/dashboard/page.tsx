@@ -19,6 +19,7 @@ import { ProgressBar } from '@/components/ui/ProgressBar';
 import { Badge } from '@/components/ui/Badge';
 import { getStreakEmoji, getStreakText, formatDate } from '@/lib/utils';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { ReviewModeSelector } from '@/components/ui/ReviewModeSelector';
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -27,6 +28,8 @@ export default function DashboardPage() {
   const { startReviewSession } = useReview();
   const router = useRouter();
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
+  const [showModeSelector, setShowModeSelector] = useState(false);
+  const [sessionType, setSessionType] = useState<'daily' | 'training'>('daily');
 
   // Мемоизированная функция загрузки данных - ОДИН РАЗ
   const loadDashboardData = useCallback(() => {
@@ -67,16 +70,21 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
-  }, []); // 🔥 Пустой массив - загружаем только при монтировании!
+  }, []);
 
-  const handleStartReview = async () => {
+    const handleStartReview = async () => {
     try {
-      await startReviewSession();
-      router.push('/review');
+        setSessionType('daily');
+        setShowModeSelector(true);
     } catch (error) {
-      console.error('Failed to start review session:', error);
+        console.error('Failed to start review session:', error);
     }
-  };
+    };
+
+    const handleStartTraining = () => {
+    setSessionType('training');
+    setShowModeSelector(true);
+    };
 
   const quickStats = [
     {
@@ -240,6 +248,26 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              {/* Тренировка */}
+                <div className="p-6 border-2 border-dashed border-green-200 rounded-lg hover:border-green-300 transition-colors">
+                <div className="text-center">
+                    <BookOpenIcon className="h-12 w-12 text-green-500 mx-auto mb-4" />
+                    <h3 className="text-lg font-medium text-gray-900 mb-2">
+                    Тренировочный полигон
+                    </h3>
+                    <p className="text-gray-600 mb-4">
+                    Практика без влияния на алгоритм
+                    </p>
+                    <Button
+                    onClick={handleStartTraining}
+                    variant="outline"
+                    className="w-full"
+                    >
+                    Начать тренировку
+                    </Button>
+                </div>
+                </div>
+
               {/* Дневной прогресс */}
               {userStats?.dailyProgress && (
                 <div className="mt-6 p-4 bg-blue-50 rounded-lg">
@@ -333,6 +361,13 @@ export default function DashboardPage() {
           </motion.div>
         )}
       </div>
+
+      {/* Модалка выбора режима */}
+<ReviewModeSelector
+  isOpen={showModeSelector}
+  onClose={() => setShowModeSelector(false)}
+  sessionType={sessionType}
+/>
     </DashboardLayout>
   );
 }
