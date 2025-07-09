@@ -319,13 +319,27 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
   };
 
   // проверка состояния загрузки
-    const isLoading = isCreatingSession.current || 
-                 (sessionCreatedRef.current && !currentSession && !isSessionCompleted) ||
-                 (!currentReviewWord && hasMoreWords && !isSessionCompleted);
+  const isLoading = isCreatingSession.current || 
+                   (sessionCreatedRef.current && !currentSession && !isSessionCompleted) ||
+                   (!currentReviewWord && hasMoreWords && !isSessionCompleted);
 
   // Проверка завершения с улучшенной логикой
 const isCompleted = isSessionCompleted || 
-                   (!hasMoreWords && isReviewSession && !isLoading && sessionCreatedRef.current);
+                   (sessionCreatedRef.current && !hasMoreWords && !isLoading && 
+                    (sessionStats.totalWords > 0 || sessionStats.total > 0));
+
+                      console.log('🔍 Детальная проверка состояния:', {
+    isSessionCompleted,
+    hasMoreWords,
+    isReviewSession,
+    isLoading,
+    sessionCreated: sessionCreatedRef.current,
+    sessionStats,
+    currentReviewWord: !!currentReviewWord,
+    currentSession: !!currentSession,
+    isCompleted,
+    creating: isCreatingSession.current
+  });
 
 const getProgress = () => {
   if (sessionStats.totalWords === 0) return 0;
@@ -371,19 +385,16 @@ const getProgress = () => {
   }
 
   // Результаты сессии
- if (isCompleted) {
-  const ModeIcon = getModeIcon();
-  
-  console.log('🎉 Показываем результаты:', {
-    isSessionCompleted,
-    hasMoreWords,
-    isReviewSession,
-    sessionStats,
-    currentSession: !!currentSession
-  });
-  
-  // ИСПРАВЛЕНИЕ: Проверяем, есть ли вообще слова
-// const hasWordsToShow = sessionStats.totalWords > 0;
+  if (isCompleted) {
+    const ModeIcon = getModeIcon();
+    
+    console.log('🎉 Показываем результаты:', {
+      isSessionCompleted,
+      hasMoreWords,
+      isReviewSession,
+      sessionStats,
+      currentSession: !!currentSession
+    });
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
@@ -422,36 +433,66 @@ const getProgress = () => {
                     <div className="text-sm text-gray-600">
                       {reviewMode === 'RECOGNITION' ? 'Узнавание' :
                        reviewMode === 'TRANSLATION_INPUT' ? 'Ввод перевода' :
-                       reviewMode === 'REVERSE_INPUT' ? 'Обратный ввод' : 'Режим'}
+                       reviewMode === 'REVERSE_INPUT' ? 'Обратный ввод' : 'Тренировка'}
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
+            {/* Детальная статистика по оценкам (только если есть данные) */}
+            {sessionStats.total > 0 && (
+              <Card>
+                <CardContent className="p-6">
+                  <h3 className="text-lg font-semibold mb-4">Детальная статистика</h3>
+                  <div className="grid grid-cols-4 gap-4">
+                    {RATING_OPTIONS.map((option) => (
+                      <div key={option.value} className="text-center">
+                        <div className="text-xl mb-1">{option.emoji}</div>
+                        <div className="text-lg font-bold">
+                          {sessionStats.ratings[option.value as keyof typeof sessionStats.ratings]}
+                        </div>
+                        <div className="text-xs text-gray-600">{option.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Кнопки действий */}
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button
                 onClick={() => router.push('/dashboard')}
-                className="flex items-center space-x-2"
+                variant="primary"
+                className="flex items-center gap-2"
               >
                 <HomeIcon className="h-4 w-4" />
-                <span>На главную</span>
+                На главную
               </Button>
               
-              <Button
-                variant="outline"
-                onClick={() => {
-                  // Сбрасываем флаги для возможности новой сессии
-                  sessionCreatedRef.current = false;
-                  isCreatingSession.current = false;
-                  // Перезагружаем страницу с теми же параметрами
-                  window.location.reload();
-                }}
-                className="flex items-center space-x-2"
-              >
-                <ArrowsRightLeftIcon className="h-4 w-4" />
-                <span>Еще раз</span>
-              </Button>
+              {sessionType === 'training' && (
+                <Button
+                  onClick={() => window.location.reload()}
+                  variant="secondary"
+                  className="flex items-center gap-2"
+                >
+                  <ArrowsRightLeftIcon className="h-4 w-4" />
+                  Еще раз
+                </Button>
+              )}
+            </div>
+
+            {/* Информация о типе сессии */}
+            <div className="text-center">
+              <Badge variant={sessionType === 'daily' ? 'primary' : 'secondary'}>
+                {sessionType === 'daily' ? 'Ежедневная тренировка' : 'Тренировочный полигон'}
+              </Badge>
+              {sessionType === 'training' && (
+                <p className="text-sm text-gray-600 mt-2">
+                  Результаты тренировочного полигона не влияют на алгоритм повторений
+                </p>
+              )}
             </div>
           </motion.div>
         </div>
