@@ -169,113 +169,94 @@ useEffect(() => {
 
   // Обработка оценки для режима Recognition
 const handleSubmitRating = async (rating: number) => {
-    if (!currentReviewWord || !currentSession) return;
+  if (!currentReviewWord || !currentSession) return;
 
-    try {
-      // ✅ ИСПРАВЛЕНИЕ: обновляем статистику ПЕРЕД отправкой
+  try {
+    // Обновляем статистику ПЕРЕД отправкой
+    setSessionStats(prev => ({
+      ...prev,
+      total: prev.total + 1,
+      correct: prev.correct + (rating >= 3 ? 1 : 0),
+      ratings: {
+        ...prev.ratings,
+        [rating]: prev.ratings[rating as keyof typeof prev.ratings] + 1
+      }
+    }));
+
+    const response = await submitReviewInSession({
+      wordId: currentReviewWord.id,
+      rating,
+      reviewMode: 'RECOGNITION',
+      direction: currentDirection,
+      timeSpent: 0
+    });
+
+    // ✅ Проверяем завершение и принудительно активируем результаты
+    if (response?.completed || !response?.hasMoreWords || !response?.currentWord) {
+      console.log('🏁 Recognition сессия завершена');
+      setForceShowResults(true);
+    }
+
+    setShowTranslation(false);
+    
+  } catch (error) {
+    console.error('❌ Ошибка отправки оценки:', error);
+    toast.error('Ошибка при сохранении результата');
+  }
+};
+
+  // обработка ввода для режимов Translation/Reverse
+const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
+  if (!validateSession()) return;
+
+  try {
+    const response = await submitReviewInSession({
+      wordId: currentReviewWord!.id,
+      userInput,
+      hintsUsed,
+      timeSpent,
+      reviewMode,
+      direction: currentDirection
+    });
+
+    console.log('✅ Ответ получен:', response);
+
+    // ✅ ПРИНУДИТЕЛЬНАЯ активация результатов
+    if (response.completed || !response.hasMoreWords || !response.currentWord) {
+      console.log('🏁 Сессия завершена, активируем результаты');
+      
+      // Обновляем статистику
       setSessionStats(prev => ({
         ...prev,
         total: prev.total + 1,
-        correct: prev.correct + (rating >= 3 ? 1 : 0),
+        correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
         ratings: {
           ...prev.ratings,
-          [rating]: prev.ratings[rating as keyof typeof prev.ratings] + 1
+          [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
         }
       }));
-
-      await submitReviewInSession({
-        wordId: currentReviewWord.id,
-        rating,
-        reviewMode: 'RECOGNITION',
-        direction: currentDirection,
-        timeSpent: 0
-      });
-
-      setShowTranslation(false);
       
-    } catch (error) {
-      console.error('❌ Ошибка отправки оценки:', error);
-      toast.error('Ошибка при сохранении результата');
-      
-      // Откатываем статистику при ошибке
-      setSessionStats(prev => ({
-        ...prev,
-        total: Math.max(0, prev.total - 1),
-        correct: prev.correct - (rating >= 3 ? 1 : 0),
-        ratings: {
-          ...prev.ratings,
-          [rating]: Math.max(0, prev.ratings[rating as keyof typeof prev.ratings] - 1)
-        }
-      }));
+      // ✅ ПРИНУДИТЕЛЬНО показываем результаты
+      setForceShowResults(true);
+      return;
     }
-  };
 
-  // ✅ ИСПРАВЛЕННАЯ обработка ввода для режимов Translation/Reverse
-const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
-    if (!validateSession()) return;
-
-    try {
-      console.log('📝 Отправка ревью перевода:', {
-        sessionId: currentSession!.sessionId,
-        wordId: currentReviewWord!.id,
-        userInput,
-        hintsUsed,
-        timeSpent,
-        reviewMode,
-        direction: currentDirection
-      });
-
-      const response = await submitReviewInSession({
-        wordId: currentReviewWord!.id,
-        userInput,
-        hintsUsed,
-        timeSpent,
-        reviewMode,
-        direction: currentDirection
-      });
-
-      console.log('✅ Ответ получен:', response);
-
-      // ✅ ИСПРАВЛЕНИЕ: проверяем завершение через новое поле
-      if (response.completed || !response.hasMoreWords || isSessionCompleted) {
-        console.log('🏁 Сессия завершена, переходим к результатам');
-        // Обновляем статистику для завершенного слова
-        setSessionStats(prev => ({
-          ...prev,
-          total: prev.total + 1,
-          correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
-          ratings: {
-            ...prev.ratings,
-            [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
-          }
-        }));
-        return;
+    // Обычное обновление статистики
+    setSessionStats(prev => ({
+      ...prev,
+      total: prev.total + 1,
+      correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
+      ratings: {
+        ...prev.ratings,
+        [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
       }
+    }));
 
-      // Обновляем статистику только если есть следующее слово
-      if (response.currentWord) {
-        setSessionStats(prev => ({
-          ...prev,
-          total: prev.total + 1,
-          correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
-          ratings: {
-            ...prev.ratings,
-            [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
-          }
-        }));
-      }
-
-    } catch (error) {
-      console.error('❌ Ошибка отправки перевода:', error);
-      
-      if (error instanceof Error && error.message.includes('Session not found')) {
-        toast.error('Сессия истекла. Создаем новую сессию...');
-        router.push('/dashboard');
-      } else {
-        toast.error('Ошибка при сохранении результата');
-      }
-    }
-  };
+  } catch (error) {
+    console.error('❌ Ошибка отправки перевода:', error);
+    toast.error('Ошибка при сохранении результата');
+  }
+};
 
   // Завершение сессии
   const handleEndSession = async () => {
@@ -318,6 +299,19 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
     }
   };
 
+  const [forceShowResults, setForceShowResults] = useState(false);
+
+  useEffect(() => {
+  console.log('🔍 Состояние компонента изменилось:', {
+    isSessionCompleted,
+    hasMoreWords,
+    currentReviewWord: !!currentReviewWord,
+    sessionStats,
+    forceShowResults,
+    isCompleted: isCompleted
+  });
+}, [isSessionCompleted, hasMoreWords, currentReviewWord, sessionStats, forceShowResults]);
+
   // проверка состояния загрузки
   const isLoading = isCreatingSession.current || 
                    (sessionCreatedRef.current && !currentSession && !isSessionCompleted) ||
@@ -325,8 +319,9 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
 
   // Проверка завершения с улучшенной логикой
 const isCompleted = isSessionCompleted || 
-                   (sessionCreatedRef.current && !hasMoreWords && !isLoading && 
-                    (sessionStats.totalWords > 0 || sessionStats.total > 0));
+                   forceShowResults ||
+                   (sessionStats.totalWords > 0 && sessionStats.total >= sessionStats.totalWords) ||
+                   (!hasMoreWords && !currentReviewWord && sessionStats.total > 0);
 
                       console.log('🔍 Детальная проверка состояния:', {
     isSessionCompleted,
@@ -340,6 +335,17 @@ const isCompleted = isSessionCompleted ||
     isCompleted,
     creating: isCreatingSession.current
   });
+
+useEffect(() => {
+  if (sessionStats.totalWords > 0 && sessionStats.total >= sessionStats.totalWords && !isCompleted) {
+    console.log('🚨 Экстренная активация результатов по таймеру');
+    const timer = setTimeout(() => {
+      setForceShowResults(true);
+    }, 1000);
+    
+    return () => clearTimeout(timer);
+  }
+}, [sessionStats.total, sessionStats.totalWords, isCompleted]);
 
 const getProgress = () => {
   if (sessionStats.totalWords === 0) return 0;

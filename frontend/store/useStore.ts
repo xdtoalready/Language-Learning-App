@@ -564,19 +564,17 @@ submitReviewInSession: async (data: {
       currentRound: response.currentRound
     });
     
-    // ✅ ИСПРАВЛЕНИЕ: Правильное обновление состояния
     const newState = {
-      currentReviewWord: nextWord || null,
-      hasMoreWords: hasMore,
-      remainingWords: remaining,
-      hintsUsed: 0, // сброс для следующего слова
-      currentRound: response.currentRound || state.currentRound,
-      currentDirection: nextWord?.direction || state.currentDirection,
-      // ✅ Устанавливаем завершение только когда действительно больше нет слов
-      isSessionCompleted: completed
+    currentReviewWord: nextWord || null,
+    hasMoreWords: hasMore,
+    remainingWords: remaining,
+    hintsUsed: 0,
+    currentRound: response.currentRound || state.currentRound,
+    currentDirection: nextWord?.direction || state.currentDirection,
+    isSessionCompleted: completed || (!hasMore && !nextWord) || response.completed === true
     };
 
-    console.log('🔄 Обновляем состояние:', newState);
+    console.log('🚩 Устанавливаем isSessionCompleted:', newState.isSessionCompleted);
     set(newState);
     
     console.log('✅ Ревью отправлено, следующее слово:', nextWord?.word || 'завершено');
