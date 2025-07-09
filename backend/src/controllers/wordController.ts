@@ -131,10 +131,10 @@ export const getDueWords = async (req: AuthRequest, res: Response): Promise<void
 
     // Фильтруем слова, которые нужно повторить сегодня
     const dueWords = words.filter(word => 
-      isWordDueForReview({ 
+    isWordDueForReview({ 
         nextReviewDate: word.nextReviewDate, 
         masteryLevel: word.masteryLevel 
-      }, today)
+    })
     );
 
     // Перемешиваем слова для разнообразия
