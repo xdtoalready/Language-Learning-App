@@ -24,6 +24,7 @@ interface CreateSessionRequest {
     tags?: string[];
     masteryLevel?: number[];
     onlyActive?: boolean;
+    limit?: number;
   };
 }
 
