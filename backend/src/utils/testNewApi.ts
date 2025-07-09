@@ -78,7 +78,7 @@ class ApiTester {
     }
 
     // Тест профиля
-    const profileResult = await this.request('/auth/profile');
+    const profileResult = await this.request('/auth/me');
     if (profileResult.status === 200) {
       this.addResult('/auth/profile', 'GET', 'PASS', 'Профиль получен', profileResult.time);
       console.log('✅ Профиль получен');
