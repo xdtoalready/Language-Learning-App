@@ -1,4 +1,4 @@
-// frontend/lib/api.ts - ОБНОВЛЕННЫЙ
+// frontend/lib/api.ts - ПОЛНОСТЬЮ ИСПРАВЛЕННЫЙ
 
 import { 
   User, 
@@ -81,31 +81,35 @@ class ApiClient {
 
   // ====================== AUTH ======================
   
-  async login(emailOrUsername: string, password: string) {
+  // ИСПРАВЛЕНО: Принимает объект с credentials
+  async login(credentials: { emailOrUsername: string; password: string }) {
     const response = await this.request<{ message: string; token: string; user: User }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ emailOrUsername, password }),
+      body: JSON.stringify(credentials),
     });
     
     this.setToken(response.token);
     return response;
   }
 
-  async register(email: string, username: string, password: string, learningLanguage: string) {
+  // ИСПРАВЛЕНО: Принимает объект с данными регистрации
+  async register(data: { email: string; username: string; password: string; learningLanguage: string }) {
     const response = await this.request<{ message: string; token: string; user: User }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, username, password, learningLanguage }),
+      body: JSON.stringify(data),
     });
     
     this.setToken(response.token);
     return response;
   }
 
+  // ИСПРАВЛЕНО: Правильный endpoint /auth/me
   async getProfile() {
-    return this.request<{ user: User }>('/auth/profile');
+    return this.request<{ user: User }>('/auth/me');
   }
 
-  async updateProfile(updates: { username?: string; learningLanguage?: string; dailyGoal?: number; avatar?: string; }) {
+  // ИСПРАВЛЕНО: Принимает объект с обновлениями
+  async updateProfile(updates: { username?: string; learningLanguage?: string; dailyGoal?: number; avatar?: string }) {
     return this.request<{ user: User }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(updates),
@@ -150,6 +154,7 @@ class ApiClient {
     }>(endpoint);
   }
 
+  // ИСПРАВЛЕНО: Принимает объект с данными слова
   async createWord(data: CreateWordRequest) {
     return this.request<{ message: string; word: Word }>('/words', {
       method: 'POST',
@@ -180,9 +185,6 @@ class ApiClient {
 
   // =================== НОВЫЕ REVIEW ENDPOINTS ===================
 
-  /**
-   * Создать новую сессию ревью
-   */
   async createReviewSession(data: CreateReviewSessionRequest): Promise<ReviewSessionResponse> {
     return this.request<ReviewSessionResponse>('/reviews/sessions', {
       method: 'POST',
@@ -190,16 +192,10 @@ class ApiClient {
     });
   }
 
-  /**
-   * Получить текущее слово в сессии
-   */
   async getCurrentWord(sessionId: string): Promise<ReviewSessionResponse> {
     return this.request<ReviewSessionResponse>(`/reviews/sessions/${sessionId}/current`);
   }
 
-  /**
-   * Отправить ревью в рамках сессии
-   */
   async submitReviewInSession(
     sessionId: string, 
     data: Omit<SubmitReviewRequest, 'sessionId'>
@@ -210,18 +206,12 @@ class ApiClient {
     });
   }
 
-  /**
-   * Завершить сессию
-   */
   async endSession(sessionId: string): Promise<{ success: boolean; sessionStats: any; message: string }> {
     return this.request(`/reviews/sessions/${sessionId}`, {
       method: 'DELETE',
     });
   }
 
-  /**
-   * Получить подсказку для слова
-   */
   async getHint(data: GetHintRequest): Promise<GetHintResponse> {
     return this.request<GetHintResponse>('/reviews/hint', {
       method: 'POST',
@@ -229,9 +219,6 @@ class ApiClient {
     });
   }
 
-  /**
-   * Получить слова для тренировочного полигона
-   */
   async getTrainingWords(params?: {
     tags?: string;
     masteryLevel?: string;
@@ -250,146 +237,78 @@ class ApiClient {
     return this.request<ActiveWordsResponse>(endpoint);
   }
 
-  // ================== LEGACY REVIEW METHODS (для обратной совместимости) ==================
+  // =================== СТАРЫЕ REVIEW ENDPOINTS (для совместимости) ===================
 
-  /**
-   * @deprecated Используйте createReviewSession + getCurrentWord
-   */
   async startReviewSession() {
-    return this.request<ReviewSessionResponse>('/reviews/start');
+    return this.request<{ 
+      word: Word | null, 
+      hasMore: boolean, 
+      remainingWords: number, 
+      message?: string 
+    }>('/reviews/session/start');
   }
 
-  /**
-   * @deprecated Используйте submitReviewInSession
-   */
   async submitReview(data: { wordId: string; rating: number }) {
-    return this.request<{ success: boolean }>('/reviews/submit', {
+    return this.request<{ message: string }>('/reviews', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  // ====================== STATS ======================
+  // =================== STATS ===================
 
   async getUserStats() {
     return this.request<{ stats: UserStats }>('/stats');
   }
 
   async updateDailyGoal(goal: number) {
-    return this.request<{ user: User }>('/stats/daily-goal', {
+    return this.request<{ message: string; user: User }>('/stats/daily-goal', {
       method: 'PUT',
       body: JSON.stringify({ dailyGoal: goal }),
     });
   }
 
-  // ====================== FRIENDS ======================
+  // =================== FRIENDSHIP ===================
 
   async getFriends() {
-    return this.request<{ friends: any[] }>('/friends');
+    return this.request<{ friends: any[] }>('/friendships');
   }
 
   async getFriendsWithClouds() {
-    return this.request<{ friends: any[] }>('/friends/clouds');
+    return this.request<{ friends: any[] }>('/friendships/clouds');
+  }
+
+  async getPendingRequests() {
+    return this.request<{ requests: any[] }>('/friendships/requests');
   }
 
   async searchUsers(query: string) {
-    return this.request<{ users: any[] }>(`/friends/search?q=${encodeURIComponent(query)}`);
+    return this.request<{ users: any[] }>(`/friendships/search?q=${encodeURIComponent(query)}`);
   }
 
   async sendFriendRequest(friendId: string) {
-    return this.request<{ message: string }>('/friends/request', {
+    return this.request<{ message: string }>('/friendships/request', {
       method: 'POST',
       body: JSON.stringify({ friendId }),
     });
   }
 
-  async getPendingRequests() {
-    return this.request<{ requests: any[] }>('/friends/pending');
-  }
-
   async respondToFriendRequest(friendshipId: string, action: 'accept' | 'reject') {
-    return this.request<{ message: string }>(`/friends/respond/${friendshipId}`, {
-      method: 'POST',
+    return this.request<{ message: string }>(`/friendships/request/${friendshipId}`, {
+      method: 'PUT',
       body: JSON.stringify({ action }),
     });
   }
 
   async removeFriend(friendshipId: string) {
-    return this.request<{ message: string }>(`/friends/${friendshipId}`, {
+    return this.request<{ message: string }>(`/friendships/${friendshipId}`, {
       method: 'DELETE',
-    });
-  }
-
-  // =================== UTILITY METHODS ===================
-
-  /**
-   * Проверить доступность API
-   */
-  async healthCheck() {
-    return this.request<{ status: string; timestamp: string }>('/health');
-  }
-
-  /**
-   * Оценить пользовательский ввод (клиентская функция для предварительной проверки)
-   */
-  evaluateInputLocally(
-    userInput: string, 
-    correctAnswer: string, 
-    synonyms: string[] = []
-  ): { isValid: boolean; suggestions: string[] } {
-    const normalizedInput = userInput.trim().toLowerCase();
-    const normalizedCorrect = correctAnswer.trim().toLowerCase();
-    
-    // Простая клиентская проверка
-    if (normalizedInput === normalizedCorrect) {
-      return { isValid: true, suggestions: [] };
-    }
-    
-    // Проверяем синонимы
-    const matchesSynonym = synonyms.some(synonym => 
-      synonym.trim().toLowerCase() === normalizedInput
-    );
-    
-    if (matchesSynonym) {
-      return { isValid: true, suggestions: [] };
-    }
-    
-    return { 
-      isValid: false, 
-      suggestions: [correctAnswer, ...synonyms].slice(0, 3) 
-    };
-  }
-
-  /**
-   * Создать быструю ежедневную сессию
-   */
-  async createDailySession(mode: ReviewMode = 'RECOGNITION'): Promise<ReviewSessionResponse> {
-    return this.createReviewSession({
-      mode,
-      sessionType: 'daily'
-    });
-  }
-
-  /**
-   * Создать тренировочную сессию
-   */
-  async createTrainingSession(
-    mode: ReviewMode = 'RECOGNITION',
-    filters?: {
-      tags?: string[];
-      masteryLevel?: number[];
-      onlyActive?: boolean;
-    }
-  ): Promise<ReviewSessionResponse> {
-    return this.createReviewSession({
-      mode,
-      sessionType: 'training',
-      filterBy: filters
     });
   }
 }
 
-// Создаем и экспортируем экземпляр
+// Создаем единственный экземпляр API клиента
 const apiClient = new ApiClient();
 
+// Экспортируем по умолчанию
 export default apiClient;

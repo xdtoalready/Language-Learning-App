@@ -236,12 +236,7 @@ export const useStore = create<AppStore>((set, get) => ({
     try {
       console.log('📝 Попытка регистрации:', { email, username, learningLanguage });
       
-      const response = await apiClient.register({ 
-        email, 
-        username, 
-        password, 
-        learningLanguage 
-      });
+      const response = await apiClient.register({ email, username, password, learningLanguage });
       
       console.log('✅ Успешная регистрация:', response.user.email);
       
