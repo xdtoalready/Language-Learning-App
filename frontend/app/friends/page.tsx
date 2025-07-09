@@ -58,26 +58,38 @@ export default function FriendsPage() {
   }, [hasLoadedInitially, loadFriends, loadPendingRequests]);
 
   // Поиск пользователей с debounce
-  useEffect(() => {
+    useEffect(() => {
     const timeoutId = setTimeout(async () => {
-      if (searchQuery.trim().length >= 2) {
+        if (searchQuery.trim().length >= 2) {
         setIsSearching(true);
         try {
-          const results = await searchUsers(searchQuery.trim());
-          setSearchResults(results);
+            console.log('🔍 Поиск друзей:', searchQuery.trim());
+            const results = await searchUsers(searchQuery.trim());
+            console.log('✅ Результаты поиска:', results);
+            setSearchResults(results);
         } catch (error) {
-          console.error('Ошибка поиска:', error);
-          toast.error('Ошибка поиска пользователей');
+            console.error('❌ Ошибка поиска:', error);
+            toast.error('Ошибка поиска пользователей');
+            setSearchResults([]);
         } finally {
-          setIsSearching(false);
+            setIsSearching(false);
         }
-      } else {
+        } else {
         setSearchResults([]);
-      }
+        setIsSearching(false);
+        }
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [searchQuery, searchUsers]);
+    }, [searchQuery, searchUsers]);
+
+    // Также можно добавить минимальную валидацию:
+// const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+//   const value = e.target.value;
+//   if (value.length <= 50) { // Максимальная длина поиска
+//     setSearchQuery(value);
+//   }
+// };
 
   const handleSendFriendRequest = async (friendId: string) => {
     try {

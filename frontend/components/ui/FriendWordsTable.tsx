@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
-import { apiClient } from '@/lib/api';
+import apiClient from '@/lib/api';
 import { toast } from 'react-hot-toast';
 import { debounce } from '@/lib/utils';
 

@@ -283,7 +283,7 @@ class ApiClient {
   }
 
   async searchUsers(query: string) {
-    return this.request<{ users: any[] }>(`/friendships/search?q=${encodeURIComponent(query)}`);
+    return this.request<{ users: any[] }>(`/friendships/search?query=${encodeURIComponent(query)}`);
   }
 
   async sendFriendRequest(friendId: string) {
@@ -303,6 +303,48 @@ class ApiClient {
   async removeFriend(friendshipId: string) {
     return this.request<{ message: string }>(`/friendships/${friendshipId}`, {
       method: 'DELETE',
+    });
+  }
+
+  // =================== ДОПОЛНИТЕЛЬНЫЕ FRIEND МЕТОДЫ ===================
+
+  async getFriendProfile(friendId: string) {
+    return this.request<{ friend: any }>(`/friendships/${friendId}/profile`);
+  }
+
+  async getFriendWords(friendId: string, params?: {
+    search?: string;
+    tags?: string;
+    page?: number;
+    limit?: number;
+  }) {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    
+    const endpoint = queryParams.toString() ? 
+      `/friendships/${friendId}/words?${queryParams}` : 
+      `/friendships/${friendId}/words`;
+    
+    return this.request<{ 
+      words: any[], 
+      availableTags: string[], 
+      pagination: { 
+        currentPage: number, 
+        totalPages: number, 
+        totalCount: number 
+      } 
+    }>(endpoint);
+  }
+
+  async copyFriendWord(friendId: string, wordId: string) {
+    return this.request<{ message: string; word: any }>(`/friendships/${friendId}/words/${wordId}/copy`, {
+      method: 'POST',
     });
   }
 }
