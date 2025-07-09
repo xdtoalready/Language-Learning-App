@@ -144,33 +144,41 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
 
     if (mode === 'TRANSLATION_INPUT') {
       // Двураундовая сессия: сначала с изучаемого на родной, потом наоборот
-      const round1Words = words.map(word => ({
+        const round1Words = words.map(word => ({
         ...word,
+        transcription: word.transcription || undefined,
+        example: word.example || undefined,
         direction: 'LEARNING_TO_NATIVE' as ReviewDirection,
         isCompleted: false
-      }));
+        }));
       
-      const round2Words = words.map(word => ({
+        const round2Words = words.map(word => ({
         ...word,
+        transcription: word.transcription || undefined,
+        example: word.example || undefined,
         direction: 'NATIVE_TO_LEARNING' as ReviewDirection,
         isCompleted: false
-      }));
+        }));
       
       sessionWords = [...round1Words, ...round2Words];
     } else if (mode === 'REVERSE_INPUT') {
       // Только обратное направление: с родного на изучаемый
-      sessionWords = words.map(word => ({
+        sessionWords = words.map(word => ({
         ...word,
+        transcription: word.transcription || undefined,
+        example: word.example || undefined,
         direction: 'NATIVE_TO_LEARNING' as ReviewDirection,
         isCompleted: false
-      }));
+        }));
     } else {
       // RECOGNITION или MIXED: стандартное направление
-      sessionWords = words.map(word => ({
+        sessionWords = words.map(word => ({
         ...word,
+        transcription: word.transcription || undefined,
+        example: word.example || undefined,
         direction: 'LEARNING_TO_NATIVE' as ReviewDirection,
         isCompleted: false
-      }));
+        }));
     }
 
     // Сохраняем сессию
