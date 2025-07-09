@@ -9,6 +9,7 @@ import {
   XCircleIcon,
   QuestionMarkCircleIcon
 } from '@heroicons/react/24/outline';
+import { toast } from 'react-hot-toast';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent } from '@/components/ui/Card';
@@ -20,6 +21,7 @@ interface TranslationInputProps {
   word: string;
   expectedAnswer: string;
   direction: ReviewDirection;
+  wordId: string; // ИСПРАВЛЕНО: добавлен wordId prop
   transcription?: string;
   example?: string;
   onSubmit: (userInput: string, hintsUsed: number, timeSpent: number) => void;
@@ -31,6 +33,7 @@ export function TranslationInput({
   word,
   expectedAnswer,
   direction,
+  wordId, // ИСПРАВЛЕНО: добавлен wordId prop
   transcription,
   example,
   onSubmit,
@@ -39,6 +42,8 @@ export function TranslationInput({
 }: TranslationInputProps) {
   const [userInput, setUserInput] = useState('');
   const [hints, setHints] = useState<Hint[]>([]);
+  const [lengthHint, setLengthHint] = useState<string | null>(null); // ИСПРАВЛЕНО: добавлено состояние
+  const [firstLetterHint, setFirstLetterHint] = useState<string | null>(null); // ИСПРАВЛЕНО: добавлено состояние
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluation, setEvaluation] = useState<InputEvaluation | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -68,45 +73,54 @@ export function TranslationInput({
   useEffect(() => {
     setUserInput('');
     setHints([]);
+    setLengthHint(null); // ИСПРАВЛЕНО: сброс состояния подсказок
+    setFirstLetterHint(null); // ИСПРАВЛЕНО: сброс состояния подсказок
     setEvaluation(null);
     setIsSubmitted(false);
-  }, [word, expectedAnswer]);
+  }, [word, expectedAnswer, wordId]);
 
-const handleHint = async (type: 'length' | 'first_letter') => {
-  // Добавьте валидацию перед запросом
-  if (!currentReviewWord) {
-    console.error('❌ Нет текущего слова для подсказки');
-    toast.error('Нет активного слова');
-    return;
-  }
-  
-  if (!currentReviewWord.id) {
-    console.error('❌ У текущего слова нет ID');
-    toast.error('Ошибка: неверные данные слова');
-    return;
-  }
-  
-  try {
-    console.log('💡 Запрос подсказки для слова:', {
-      wordId: currentReviewWord.id,
-      word: currentReviewWord.word,
-      type
-    });
-    
-    const hint = await getHint(currentReviewWord.id, type);
-    
-    if (type === 'length') {
-      setLengthHint(hint.content);
-    } else {
-      setFirstLetterHint(hint.content);
+  // ИСПРАВЛЕНО: полностью переписанная функция handleHint
+  const handleHint = async (type: 'length' | 'first_letter') => {
+    // Валидация wordId
+    if (!wordId) {
+      console.error('❌ Нет wordId для подсказки');
+      toast.error('Ошибка: неверные данные слова');
+      return;
     }
     
-    toast.success(`Подсказка: ${hint.content}`);
-  } catch (error) {
-    console.error('Ошибка получения подсказки:', error);
-    toast.error('Не удалось получить подсказку');
-  }
-};
+    // Проверяем, не использовалась ли уже эта подсказка
+    const alreadyUsed = hints.some(h => h.type === type);
+    if (alreadyUsed) {
+      toast.info('Эта подсказка уже использована');
+      return;
+    }
+    
+    try {
+      console.log('💡 Запрос подсказки для слова:', {
+        wordId,
+        word,
+        type
+      });
+      
+      const hint = await getHint(wordId, type);
+      
+      // Добавляем подсказку в локальный массив
+      const newHint: Hint = { type, content: hint.content, used: true };
+      setHints(prev => [...prev, newHint]);
+      
+      // Сохраняем подсказку в соответствующее состояние
+      if (type === 'length') {
+        setLengthHint(hint.content);
+      } else {
+        setFirstLetterHint(hint.content);
+      }
+      
+      toast.success(`Подсказка: ${hint.content}`);
+    } catch (error) {
+      console.error('Ошибка получения подсказки:', error);
+      toast.error('Не удалось получить подсказку');
+    }
+  };
 
   const evaluateInput = async (input: string): Promise<InputEvaluation> => {
     // Простая клиентская оценка (в реальном проекте лучше через API)
@@ -299,6 +313,7 @@ const handleHint = async (type: 'length' | 'first_letter') => {
           >
             <LightBulbIcon className="h-4 w-4" />
             <span>Длина</span>
+            {lengthHint && <Badge variant="secondary" className="ml-1">✓</Badge>}
           </Button>
           
           <Button
@@ -311,40 +326,30 @@ const handleHint = async (type: 'length' | 'first_letter') => {
           >
             <QuestionMarkCircleIcon className="h-4 w-4" />
             <span>Первая буква</span>
+            {firstLetterHint && <Badge variant="secondary" className="ml-1">✓</Badge>}
           </Button>
         </div>
 
-        {/* Отображение подсказок */}
-        <AnimatePresence>
-          {hints.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="space-y-2"
-            >
-              {hints.map((hint, index) => (
-                <div key={index} className="text-center">
-                  <Badge variant="secondary" className="text-sm">
-                    💡 {hint.content}
-                  </Badge>
-                </div>
-              ))}
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* Отображение полученных подсказок */}
+        {(lengthHint || firstLetterHint) && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <div className="text-sm text-yellow-800">
+              <strong>Подсказки:</strong>
+              {lengthHint && <div>• Длина: {lengthHint}</div>}
+              {firstLetterHint && <div>• Первая буква: {firstLetterHint}</div>}
+            </div>
+          </div>
+        )}
 
         {/* Кнопка отправки */}
         {!isSubmitted && (
-          <div className="text-center">
-            <Button
-              type="submit"
-              disabled={!userInput.trim() || isEvaluating || disabled}
-              className="w-full max-w-xs"
-            >
-              {isEvaluating ? 'Проверка...' : 'Проверить'}
-            </Button>
-          </div>
+          <Button
+            type="submit"
+            className="w-full"
+            disabled={!userInput.trim() || disabled}
+          >
+            Проверить
+          </Button>
         )}
       </form>
 
@@ -354,39 +359,42 @@ const handleHint = async (type: 'length' | 'first_letter') => {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
+            exit={{ opacity: 0, y: -20 }}
             className="space-y-4"
           >
-            <Card className={`border-2 ${
-              evaluation.score >= 3 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'
-            }`}>
-              <CardContent className="p-4 text-center">
-                <div className="flex items-center justify-center space-x-2 mb-2">
+            <Card className={`border-2 ${evaluation.score >= 3 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+              <CardContent className="p-6 text-center">
+                <div className="flex items-center justify-center space-x-2 mb-3">
                   {evaluation.score >= 3 ? (
-                    <CheckCircleIcon className="h-6 w-6 text-green-600" />
+                    <CheckCircleIcon className="h-8 w-8 text-green-600" />
                   ) : (
-                    <XCircleIcon className="h-6 w-6 text-red-600" />
+                    <XCircleIcon className="h-8 w-8 text-red-600" />
                   )}
-                  <span className={`px-3 py-1 rounded-full text-sm font-medium ${getScoreColor(evaluation.score)}`}>
+                  <Badge className={getScoreColor(evaluation.score)}>
                     {getScoreText(evaluation.score)}
-                  </span>
+                  </Badge>
                 </div>
                 
-                <div className="space-y-1">
-                  <p className="text-sm text-gray-600">
-                    Ваш ответ: <span className="font-medium">{userInput}</span>
-                  </p>
-                  <p className="text-sm text-gray-600">
-                    Правильный: <span className="font-medium">{expectedAnswer}</span>
-                  </p>
-                  {evaluation.similarity < 1.0 && (
-                    <p className="text-xs text-gray-500">
-                      Похожесть: {Math.round(evaluation.similarity * 100)}%
-                    </p>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <p><strong>Ваш ответ:</strong> {userInput}</p>
+                  <p><strong>Правильный ответ:</strong> {expectedAnswer}</p>
+                  {hints.length > 0 && (
+                    <p><strong>Использовано подсказок:</strong> {hints.length}</p>
                   )}
+                  <p><strong>Время:</strong> {timeSpent}с</p>
                 </div>
               </CardContent>
             </Card>
+
+            {evaluation.score < 3 && (
+              <Button
+                onClick={handleRetry}
+                variant="outline"
+                className="w-full"
+              >
+                Попробовать снова
+              </Button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

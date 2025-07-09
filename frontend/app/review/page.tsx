@@ -117,34 +117,48 @@ export default function ReviewPage() {
   };
 
   // Обработка ввода для режимов Translation/Reverse
-  const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
-    if (!currentReviewWord || !currentSession) return;
+const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
+  if (!currentReviewWord || !currentSession) {
+    console.error('❌ Нет currentReviewWord или currentSession');
+    return;
+  }
 
-    try {
-      const response = await submitReviewInSession({
-        wordId: currentReviewWord.id,
-        userInput,
-        hintsUsed,
-        timeSpent,
-        reviewMode,
-        direction: currentDirection
-      });
+  try {
+    console.log('📝 Отправка ревью перевода:', {
+      wordId: currentReviewWord.id,
+      userInput,
+      hintsUsed,
+      timeSpent,
+      reviewMode,
+      direction: currentDirection
+    });
 
-      // Обновляем статистику (приблизительно, так как оценка будет получена от сервера)
-      setSessionStats(prev => ({
-        total: prev.total + 1,
-        correct: prev.correct + 1, // Упрощенно считаем правильным
-        ratings: {
-          ...prev.ratings,
-          3: prev.ratings[3] + 1 // Упрощенно добавляем к "хорошо"
-        }
-      }));
+    const response = await submitReviewInSession({
+      wordId: currentReviewWord.id,
+      userInput,
+      hintsUsed,
+      timeSpent,
+      reviewMode,
+      direction: currentDirection
+    });
 
-    } catch (error) {
-      console.error('Ошибка отправки перевода:', error);
-      toast.error('Ошибка при сохранении результата');
-    }
-  };
+    console.log('✅ Ответ получен:', response);
+
+    // Обновляем статистику (приблизительно, так как оценка будет получена от сервера)
+    setSessionStats(prev => ({
+      total: prev.total + 1,
+      correct: prev.correct + 1, // Упрощенно считаем правильным
+      ratings: {
+        ...prev.ratings,
+        3: prev.ratings[3] + 1 // Упрощенно добавляем к "хорошо"
+      }
+    }));
+
+  } catch (error) {
+    console.error('❌ Ошибка отправки перевода:', error);
+    toast.error('Ошибка при сохранении результата');
+  }
+};
 
   // Завершение сессии
   const handleEndSession = async () => {
@@ -446,23 +460,24 @@ export default function ReviewPage() {
           )}
 
           {/* Режимы ввода */}
-          {(reviewMode === 'TRANSLATION_INPUT' || reviewMode === 'REVERSE_INPUT') && (
+            {(reviewMode === 'TRANSLATION_INPUT' || reviewMode === 'REVERSE_INPUT') && currentReviewWord && (
             <motion.div
-              key="input"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
+                key="input"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -20 }}
             >
-              <TranslationInput
+                <TranslationInput
                 word={getWordToShow()}
                 expectedAnswer={getExpectedAnswer()}
                 direction={currentDirection}
+                wordId={currentReviewWord.id}
                 transcription={currentReviewWord.transcription}
                 example={currentReviewWord.example}
                 onSubmit={handleTranslationSubmit}
-              />
+                />
             </motion.div>
-          )}
+            )}
         </AnimatePresence>
       </div>
     </div>
