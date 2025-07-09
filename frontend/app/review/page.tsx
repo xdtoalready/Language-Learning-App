@@ -1,6 +1,8 @@
+// frontend/app/review/page.tsx - ИСПРАВЛЕННАЯ ВЕРСИЯ
+
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { toast } from 'react-hot-toast';
@@ -33,6 +35,10 @@ export default function ReviewPage() {
   const router = useRouter();
   const { isAuthenticated } = useAuth();
   
+  // ✅ ИСПРАВЛЕНО: Добавляем ref для предотвращения дублирования
+  const isCreatingSessionRef = useRef(false);
+  const lastSessionIdRef = useRef<string | null>(null);
+  
   const { 
     currentSession,
     sessionType,
@@ -62,33 +68,81 @@ export default function ReviewPage() {
   const urlSessionType = searchParams.get('sessionType') as 'daily' | 'training' || 'daily';
   const urlMode = searchParams.get('mode') as ReviewMode || 'RECOGNITION';
 
-  // Инициализация сессии
-    useEffect(() => {
+  // ✅ ИСПРАВЛЕНО: Инициализация сессии с защитой от дублирования
+  useEffect(() => {
     if (!isAuthenticated) {
-        router.push('/auth');
-        return;
+      router.push('/auth');
+      return;
     }
 
-    // Создаем сессию только если её нет И нет текущей сессии
-    if (!isReviewSession && !currentSession && (searchParams.get('sessionType') || searchParams.get('mode'))) {
-        console.log('🔄 ReviewPage: Создание новой сессии...', {
+    const hasUrlParams = searchParams.get('sessionType') || searchParams.get('mode');
+    const needsNewSession = !isReviewSession && !currentSession && hasUrlParams;
+    
+    // Проверяем что у нас уже есть сессия с правильным ID
+    const currentSessionId = currentSession?.sessionId;
+    if (currentSessionId && lastSessionIdRef.current === currentSessionId) {
+      console.log('🔄 Сессия уже создана и активна:', currentSessionId);
+      return;
+    }
+
+    if (needsNewSession && !isCreatingSessionRef.current) {
+      console.log('🔄 ReviewPage: Создание новой сессии...', {
         sessionType: urlSessionType,
         mode: urlMode,
+        isCreating: isCreatingSessionRef.current,
         hasCurrentSession: !!currentSession,
         isReviewSession
-        });
-        
-        createReviewSession(urlMode, urlSessionType).catch((error) => {
-        console.error('Ошибка создания сессии:', error);
-        toast.error('Не удалось создать сессию повторения');
-        router.push('/dashboard');
+      });
+
+      // Устанавливаем флаг что сессия создается
+      isCreatingSessionRef.current = true;
+      
+      createReviewSession(urlMode, urlSessionType)
+        .then((response) => {
+          console.log('✅ Сессия успешно создана');
+          lastSessionIdRef.current = response?.session?.sessionId || null;
+        })
+        .catch((error) => {
+          console.error('❌ Ошибка создания сессии:', error);
+          toast.error('Не удалось создать сессию повторения');
+          router.push('/dashboard');
+        })
+        .finally(() => {
+          // Сбрасываем флаг через небольшую задержку
+          setTimeout(() => {
+            isCreatingSessionRef.current = false;
+          }, 1000);
         });
     }
-    }, [isAuthenticated, isReviewSession, currentSession, urlSessionType, urlMode, createReviewSession, router, searchParams]);
+  }, [isAuthenticated, isReviewSession, currentSession, urlSessionType, urlMode, createReviewSession, router, searchParams]);
+
+  // ✅ ИСПРАВЛЕНО: Дополнительная проверка сессии перед отправкой
+  const validateSession = () => {
+    if (!currentSession) {
+      console.error('❌ Нет активной сессии');
+      toast.error('Сессия не найдена. Перенаправляем на главную.');
+      router.push('/dashboard');
+      return false;
+    }
+
+    if (!currentReviewWord) {
+      console.error('❌ Нет текущего слова');
+      toast.error('Слово не загружено. Попробуйте еще раз.');
+      return false;
+    }
+
+    console.log('✅ Валидация сессии прошла:', {
+      sessionId: currentSession.sessionId,
+      wordId: currentReviewWord.id,
+      word: currentReviewWord.word
+    });
+
+    return true;
+  };
 
   // Обработка оценки для режима Recognition
   const handleSubmitRating = async (rating: number) => {
-    if (!currentReviewWord || !currentSession) return;
+    if (!validateSession()) return;
 
     try {
       setSessionStats(prev => ({
@@ -101,7 +155,7 @@ export default function ReviewPage() {
       }));
 
       await submitReviewInSession({
-        wordId: currentReviewWord.id,
+        wordId: currentReviewWord!.id,
         rating,
         reviewMode: 'RECOGNITION',
         direction: currentDirection,
@@ -111,63 +165,69 @@ export default function ReviewPage() {
       setShowTranslation(false);
       
     } catch (error) {
-      console.error('Ошибка отправки оценки:', error);
+      console.error('❌ Ошибка отправки оценки:', error);
       toast.error('Ошибка при сохранении результата');
     }
   };
 
-  // Обработка ввода для режимов Translation/Reverse
-const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
-  if (!currentReviewWord || !currentSession) {
-    console.error('❌ Нет currentReviewWord или currentSession');
-    return;
-  }
+  // ✅ ИСПРАВЛЕНО: Обработка ввода с валидацией сессии
+  const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
+    if (!validateSession()) return;
 
-  try {
-    console.log('📝 Отправка ревью перевода:', {
-      wordId: currentReviewWord.id,
-      userInput,
-      hintsUsed,
-      timeSpent,
-      reviewMode,
-      direction: currentDirection
-    });
+    try {
+      console.log('📝 Отправка ревью перевода:', {
+        sessionId: currentSession!.sessionId,
+        wordId: currentReviewWord!.id,
+        userInput,
+        hintsUsed,
+        timeSpent,
+        reviewMode,
+        direction: currentDirection
+      });
 
-    const response = await submitReviewInSession({
-      wordId: currentReviewWord.id,
-      userInput,
-      hintsUsed,
-      timeSpent,
-      reviewMode,
-      direction: currentDirection
-    });
+      const response = await submitReviewInSession({
+        wordId: currentReviewWord!.id,
+        userInput,
+        hintsUsed,
+        timeSpent,
+        reviewMode,
+        direction: currentDirection
+      });
 
-    console.log('✅ Ответ получен:', response);
+      console.log('✅ Ответ получен:', response);
 
-    // Обновляем статистику (приблизительно, так как оценка будет получена от сервера)
-    setSessionStats(prev => ({
-      total: prev.total + 1,
-      correct: prev.correct + 1, // Упрощенно считаем правильным
-      ratings: {
-        ...prev.ratings,
-        3: prev.ratings[3] + 1 // Упрощенно добавляем к "хорошо"
+      // Обновляем статистику
+      setSessionStats(prev => ({
+        total: prev.total + 1,
+        correct: prev.correct + 1,
+        ratings: {
+          ...prev.ratings,
+          3: prev.ratings[3] + 1
+        }
+      }));
+
+    } catch (error) {
+      console.error('❌ Ошибка отправки перевода:', error);
+      
+      // Проверяем тип ошибки
+      if (error instanceof Error && error.message.includes('Session not found')) {
+        toast.error('Сессия истекла. Создаем новую сессию...');
+        router.push('/dashboard');
+      } else {
+        toast.error('Ошибка при сохранении результата');
       }
-    }));
-
-  } catch (error) {
-    console.error('❌ Ошибка отправки перевода:', error);
-    toast.error('Ошибка при сохранении результата');
-  }
-};
+    }
+  };
 
   // Завершение сессии
   const handleEndSession = async () => {
     try {
       if (currentSession) {
+        console.log('🏁 Завершение сессии:', currentSession.sessionId);
         await endSessionNew();
       }
     } catch (error) {
-      console.error('Ошибка завершения сессии:', error);
+      console.error('❌ Ошибка завершения сессии:', error);
     } finally {
       router.push('/dashboard');
     }
@@ -182,8 +242,8 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
       : currentReviewWord.translation;
   };
 
-  // Получение ожидаемого ответа
-  const getExpectedAnswer = () => {
+  // Получение правильного ответа для режимов ввода
+  const getCorrectAnswer = () => {
     if (!currentReviewWord) return '';
     
     return currentDirection === 'LEARNING_TO_NATIVE' 
@@ -191,57 +251,19 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
       : currentReviewWord.word;
   };
 
-  // Получение иконки режима
-  const getModeIcon = () => {
-    switch (reviewMode) {
-      case 'RECOGNITION':
-        return EyeIcon;
-      case 'TRANSLATION_INPUT':
-        return PencilIcon;
-      case 'REVERSE_INPUT':
-        return ArrowsRightLeftIcon;
-      default:
-        return EyeIcon;
-    }
-  };
-
-  const getModeTitle = () => {
-    switch (reviewMode) {
-      case 'RECOGNITION':
-        return 'Узнавание';
-      case 'TRANSLATION_INPUT':
-        return 'Ввод перевода';
-      case 'REVERSE_INPUT':
-        return 'Обратный ввод';
-      default:
-        return 'Повторение';
-    }
-  };
-
-  // Проверка авторизации
-  if (!isAuthenticated) {
+  // Если сессия завершена, показываем результаты
+  if (isReviewSession && !hasMoreWords && !currentReviewWord) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600">Перенаправление...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Экран завершения сессии
-  if (!isReviewSession || (!currentReviewWord && !hasMoreWords)) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-blue-50 flex items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-6">
         <motion.div
           initial={{ opacity: 0, scale: 0.9 }}
           animate={{ opacity: 1, scale: 1 }}
-          className="max-w-md w-full"
+          className="w-full max-w-md"
         >
-          <Card>
-            <CardContent className="p-8 text-center">
+          <Card className="text-center">
+            <CardContent className="p-8">
               <h1 className="text-2xl font-bold text-gray-900 mb-2">
-                Сессия завершена! 🎉
+                Поздравляем! 🎉
               </h1>
               <p className="text-gray-600 mb-6">
                 Вы завершили сессию {sessionType === 'daily' ? 'повторения' : 'тренировки'}!
@@ -297,16 +319,14 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-gray-600">Подготовка слова для повторения...</p>
+          <p className="text-gray-600">
+            {isCreatingSessionRef.current ? 'Создание сессии...' : 'Подготовка слова для повторения...'}
+          </p>
         </div>
       </div>
     );
   }
 
-    const totalWords = currentSession?.totalWords || 0;
-    const completedWords = totalWords - (remainingWords || 0);
-    const progressPercentage = totalWords > 0 ? Math.round((completedWords / totalWords) * 100) : 0;
-  const ModeIcon = getModeIcon();
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
