@@ -425,7 +425,12 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
       filterBy: filters
     });
     
-    set({ 
+    // Проверяем корректность ответа
+    if (!response.session || !response.session.sessionId) {
+      throw new Error('Некорректный ответ от сервера: отсутствует sessionId');
+    }
+
+    const sessionData = {
       currentSession: response.session,
       sessionType,
       reviewMode: mode,
@@ -434,16 +439,21 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
       currentRound: response.session?.currentRound || 1,
       isReviewSession: true,
       currentReviewWord: response.currentWord,
-      hasMoreWords: response.hasMoreWords || response.hasMore || false,
+      hasMoreWords: response.hasMoreWords ?? response.hasMore ?? false,
       remainingWords: response.remainingWords ?? response.remaining ?? 0
-    });
+    };
+    
+    console.log('✅ Устанавливаем состояние сессии:', sessionData);
+    set(sessionData);
     
     console.log('✅ Сессия создана:', {
-      sessionId: response.session?.sessionId,
+      sessionId: response.session.sessionId,
       currentWord: response.currentWord?.word,
-      remainingWords: response.remainingWords ?? response.remaining ?? 0,
-      hasMoreWords: response.hasMoreWords || response.hasMore || false
+      remainingWords: sessionData.remainingWords,
+      hasMoreWords: sessionData.hasMoreWords
     });
+    
+    return response;
   } catch (error) {
     console.error('❌ Ошибка создания сессии:', error);
     throw error;
@@ -465,7 +475,14 @@ submitReviewInSession: async (data: {
       throw new Error('Нет активной сессии');
     }
     
-    console.log('📝 Отправка ревью в сессии:', data);
+    console.log('📝 Отправка ревью в сессии:', {
+      sessionId: state.currentSession.sessionId,
+      wordId: data.wordId,
+      userInput: data.userInput,
+      hintsUsed: data.hintsUsed,
+      reviewMode: data.reviewMode || state.reviewMode,
+      direction: data.direction || state.currentDirection
+    });
     
     const response = await apiClient.submitReviewInSession(state.currentSession.sessionId, {
       ...data,
@@ -476,42 +493,62 @@ submitReviewInSession: async (data: {
     
     console.log('🔄 Полный ответ от API:', response);
     
+    // Проверяем валидность ответа
+    if (!response || typeof response !== 'object') {
+      throw new Error('Некорректный ответ от сервера');
+    }
+
     const nextWord = response.currentWord;
-    const hasMore = response.hasMoreWords || response.hasMore || false;
+    const hasMore = response.hasMoreWords ?? response.hasMore ?? false;
     const remaining = response.remainingWords ?? response.remaining ?? 0;
+    const completed = response.completed ?? false;
     
     console.log('📊 Обработанные данные:', {
       nextWord: nextWord?.word || 'null',
       hasMore,
       remaining,
+      completed,
       currentRound: response.currentRound
     });
     
-    // Обновляем состояние
-    set({
-      currentReviewWord: nextWord,
+    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: правильное обновление состояния
+    const newState = {
+      currentReviewWord: nextWord || null,
       hasMoreWords: hasMore,
       remainingWords: remaining,
       hintsUsed: 0, // сброс для следующего слова
       currentRound: response.currentRound || state.currentRound,
       currentDirection: nextWord?.direction || state.currentDirection
-    });
+    };
+
+    // Если сессия завершена, обновляем соответствующие флаги
+    if (completed || !hasMore) {
+      console.log('🏁 Сессия завершена - обновляем флаги');
+      newState.isReviewSession = false;
+      // НЕ удаляем currentSession сразу - он нужен для отображения результатов
+    }
+
+    console.log('🔄 Обновляем состояние:', newState);
+    set(newState);
     
     console.log('✅ Ревью отправлено, следующее слово:', nextWord?.word || 'завершено');
-    
-    // Если сессия завершена
-    if (!hasMore) {
-      console.log('🏁 Сессия завершена');
-      set({ 
-        isReviewSession: false,
-        currentSession: null,
-        currentReviewWord: null 
-      });
-    }
     
     return response;
   } catch (error) {
     console.error('❌ Ошибка отправки ревью:', error);
+    
+    // Если ошибка 404 - сессия не найдена, очищаем состояние
+    if (error instanceof Error && error.message.includes('404')) {
+      console.log('🔄 Сессия не найдена - очищаем состояние');
+      set({
+        isReviewSession: false,
+        currentSession: null,
+        currentReviewWord: null,
+        hasMoreWords: false,
+        remainingWords: 0
+      });
+    }
+    
     throw error;
   }
 },
@@ -554,6 +591,11 @@ getHint: async (wordId: string, hintType: 'length' | 'first_letter') => {
       currentHintsUsed: state.hintsUsed,
       direction: state.currentDirection
     });
+    
+    // Проверяем корректность ответа
+    if (!response || !response.hint) {
+      throw new Error('Некорректный ответ от сервера подсказок');
+    }
     
     // Увеличиваем счетчик подсказок
     set({ hintsUsed: state.hintsUsed + 1 });
@@ -600,13 +642,33 @@ endSessionNew: async () => {
     const state = get();
     if (!state.currentSession) {
       console.warn('⚠️ Нет активной сессии для завершения');
-      return;
+      return null;
     }
     
     console.log('🏁 Завершение сессии:', state.currentSession.sessionId);
     
     const response = await apiClient.endSession(state.currentSession.sessionId);
     
+    // Полная очистка состояния сессии
+    set({
+      isReviewSession: false,
+      currentSession: null,
+      currentReviewWord: null,
+      hasMoreWords: false,
+      remainingWords: 0,
+      hintsUsed: 0,
+      currentRound: 1,
+      reviewMode: undefined,
+      currentDirection: 'LEARNING_TO_NATIVE',
+      sessionType: undefined
+    });
+    
+    console.log('✅ Сессия завершена, состояние очищено:', response.sessionStats);
+    return response.sessionStats;
+  } catch (error) {
+    console.error('❌ Ошибка завершения сессии:', error);
+    
+    // В любом случае очищаем состояние при ошибке
     set({
       isReviewSession: false,
       currentSession: null,
@@ -617,10 +679,6 @@ endSessionNew: async () => {
       currentRound: 1
     });
     
-    console.log('✅ Сессия завершена:', response.sessionStats);
-    return response.sessionStats;
-  } catch (error) {
-    console.error('❌ Ошибка завершения сессии:', error);
     throw error;
   }
 },

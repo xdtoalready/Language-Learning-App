@@ -21,7 +21,7 @@ interface TranslationInputProps {
   word: string;
   expectedAnswer: string;
   direction: ReviewDirection;
-  wordId: string; // ИСПРАВЛЕНО: добавлен wordId prop
+  wordId: string;
   transcription?: string;
   example?: string;
   onSubmit: (userInput: string, hintsUsed: number, timeSpent: number) => void;
@@ -33,7 +33,7 @@ export function TranslationInput({
   word,
   expectedAnswer,
   direction,
-  wordId, // ИСПРАВЛЕНО: добавлен wordId prop
+  wordId,
   transcription,
   example,
   onSubmit,
@@ -42,8 +42,8 @@ export function TranslationInput({
 }: TranslationInputProps) {
   const [userInput, setUserInput] = useState('');
   const [hints, setHints] = useState<Hint[]>([]);
-  const [lengthHint, setLengthHint] = useState<string | null>(null); // ИСПРАВЛЕНО: добавлено состояние
-  const [firstLetterHint, setFirstLetterHint] = useState<string | null>(null); // ИСПРАВЛЕНО: добавлено состояние
+  const [lengthHint, setLengthHint] = useState<string | null>(null);
+  const [firstLetterHint, setFirstLetterHint] = useState<string | null>(null);
   const [isEvaluating, setIsEvaluating] = useState(false);
   const [evaluation, setEvaluation] = useState<InputEvaluation | null>(null);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -51,37 +51,68 @@ export function TranslationInput({
   const [timeSpent, setTimeSpent] = useState(0);
   
   const inputRef = useRef<HTMLInputElement>(null);
+  const submitTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const { getHint } = useReview();
 
-  // Обновляем время каждую секунду
+  // ✅ Обновляем время каждую секунду
   useEffect(() => {
+    if (isSubmitted) return; // Останавливаем таймер после отправки
+    
     const interval = setInterval(() => {
       setTimeSpent(Math.floor((Date.now() - startTime) / 1000));
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [startTime]);
+  }, [startTime, isSubmitted]);
 
-  // Фокус на поле ввода при загрузке
+  // ✅ Фокус на поле ввода при загрузке
   useEffect(() => {
-    if (inputRef.current && !disabled) {
+    if (inputRef.current && !disabled && !isSubmitted) {
       inputRef.current.focus();
     }
-  }, [disabled]);
+  }, [disabled, isSubmitted]);
 
-  // Сброс состояния при изменении слова
+  // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Полный сброс состояния при изменении слова
   useEffect(() => {
+    console.log('🔄 TranslationInput: Сброс состояния для нового слова:', {
+      newWordId: wordId,
+      newWord: word
+    });
+    
+    // Очищаем таймаут если он есть
+    if (submitTimeoutRef.current) {
+      clearTimeout(submitTimeoutRef.current);
+      submitTimeoutRef.current = null;
+    }
+    
+    // Полный сброс состояния
     setUserInput('');
     setHints([]);
-    setLengthHint(null); // ИСПРАВЛЕНО: сброс состояния подсказок
-    setFirstLetterHint(null); // ИСПРАВЛЕНО: сброс состояния подсказок
+    setLengthHint(null);
+    setFirstLetterHint(null);
     setEvaluation(null);
     setIsSubmitted(false);
-  }, [word, expectedAnswer, wordId]);
+    setIsEvaluating(false);
+    
+    // Устанавливаем фокус на поле ввода
+    setTimeout(() => {
+      if (inputRef.current && !disabled) {
+        inputRef.current.focus();
+      }
+    }, 100);
+  }, [word, expectedAnswer, wordId, disabled]);
 
-  // ИСПРАВЛЕНО: полностью переписанная функция handleHint
+  // ✅ Очистка таймаута при размонтировании
+  useEffect(() => {
+    return () => {
+      if (submitTimeoutRef.current) {
+        clearTimeout(submitTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // ✅ ИСПРАВЛЕННАЯ функция получения подсказки
   const handleHint = async (type: 'length' | 'first_letter') => {
-    // Валидация wordId
     if (!wordId) {
       console.error('❌ Нет wordId для подсказки');
       toast.error('Ошибка: неверные данные слова');
@@ -99,48 +130,56 @@ export function TranslationInput({
       console.log('💡 Запрос подсказки для слова:', {
         wordId,
         word,
-        type
+        type,
+        currentHints: hints.length
       });
       
-      const hint = await getHint(wordId, type);
+      const hintResponse = await getHint(wordId, type);
+      
+      // Создаем объект подсказки
+      const newHint: Hint = { 
+        type, 
+        content: hintResponse.content || hintResponse, // Поддержка разных форматов ответа
+        used: true 
+      };
       
       // Добавляем подсказку в локальный массив
-      const newHint: Hint = { type, content: hint.content, used: true };
       setHints(prev => [...prev, newHint]);
       
       // Сохраняем подсказку в соответствующее состояние
       if (type === 'length') {
-        setLengthHint(hint.content);
+        setLengthHint(newHint.content);
       } else {
-        setFirstLetterHint(hint.content);
+        setFirstLetterHint(newHint.content);
       }
       
-      toast.success(`Подсказка: ${hint.content}`);
+      console.log('✅ Подсказка получена:', newHint.content);
+      toast.success(`Подсказка: ${newHint.content}`);
     } catch (error) {
-      console.error('Ошибка получения подсказки:', error);
+      console.error('❌ Ошибка получения подсказки:', error);
       toast.error('Не удалось получить подсказку');
     }
   };
 
+  // ✅ Улучшенная функция оценки
   const evaluateInput = async (input: string): Promise<InputEvaluation> => {
-    // Простая клиентская оценка (в реальном проекте лучше через API)
     const cleanInput = input.trim().toLowerCase();
     const cleanExpected = expectedAnswer.trim().toLowerCase();
     
     if (cleanInput === cleanExpected) {
       return {
-        score: hints.length > 0 ? 3 : 4,
+        score: hints.length > 0 ? Math.max(2, 4 - hints.length) : 4,
         reason: hints.length > 0 ? 'hint_used' : 'exact',
         similarity: 1.0
       };
     }
     
-    // Проверяем опечатки (простая проверка)
+    // Проверяем опечатки
     const similarity = calculateSimilarity(cleanInput, cleanExpected);
     
     if (similarity >= 0.8) {
       return {
-        score: hints.length > 0 ? 2 : 3,
+        score: hints.length > 0 ? Math.max(1, 3 - hints.length) : 3,
         reason: 'typo',
         similarity
       };
@@ -185,12 +224,20 @@ export function TranslationInput({
     return (longer.length - levenshteinDistance(longer, shorter)) / longer.length;
   };
 
+  // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: убираем setTimeout и делаем мгновенную отправку
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
     if (!userInput.trim() || isEvaluating || isSubmitted || disabled) {
       return;
     }
+
+    console.log('📝 TranslationInput: Отправка ответа:', {
+      userInput: userInput.trim(),
+      hintsUsed: hints.length,
+      timeSpent,
+      wordId
+    });
 
     setIsEvaluating(true);
     setIsSubmitted(true);
@@ -199,22 +246,43 @@ export function TranslationInput({
       const result = await evaluateInput(userInput);
       setEvaluation(result);
       
-      // Отправляем результат родительскому компоненту
-      setTimeout(() => {
-        onSubmit(userInput, hints.length, timeSpent);
-      }, 2000); // Показываем результат 2 секунды
+      console.log('✅ TranslationInput: Оценка получена:', result);
+      
+      // ✅ ИСПРАВЛЕНИЕ: убираем setTimeout - отправляем сразу после показа результата
+      // Показываем результат 1.5 секунды, затем отправляем
+      submitTimeoutRef.current = setTimeout(() => {
+        console.log('📤 TranslationInput: Отправка результата родителю');
+        onSubmit(userInput.trim(), hints.length, timeSpent);
+        submitTimeoutRef.current = null;
+      }, 1500);
       
     } catch (error) {
-      console.error('Ошибка оценки ввода:', error);
+      console.error('❌ Ошибка оценки ввода:', error);
       setIsEvaluating(false);
       setIsSubmitted(false);
+      toast.error('Ошибка при оценке ответа');
     }
   };
 
   const handleRetry = () => {
+    // Очищаем таймаут
+    if (submitTimeoutRef.current) {
+      clearTimeout(submitTimeoutRef.current);
+      submitTimeoutRef.current = null;
+    }
+    
     setUserInput('');
     setIsSubmitted(false);
+    setIsEvaluating(false);
     setEvaluation(null);
+    
+    // Фокус на поле ввода
+    setTimeout(() => {
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    }, 100);
+    
     if (onRetry) onRetry();
   };
 
@@ -242,6 +310,20 @@ export function TranslationInput({
     return direction === 'LEARNING_TO_NATIVE' 
       ? 'Переведите на русский:'
       : 'Переведите на изучаемый язык:';
+  };
+
+  const getScoreIcon = (score: number) => {
+    switch (score) {
+      case 4:
+      case 3:
+        return <CheckCircleIcon className="h-6 w-6" />;
+      case 2:
+        return <QuestionMarkCircleIcon className="h-6 w-6" />;
+      case 1:
+        return <XCircleIcon className="h-6 w-6" />;
+      default:
+        return null;
+    }
   };
 
   return (
@@ -282,75 +364,58 @@ export function TranslationInput({
             onChange={(e) => setUserInput(e.target.value)}
             placeholder="Введите перевод..."
             disabled={disabled || isSubmitted}
-            className="text-center text-lg py-3"
-            autoComplete="off"
+            className={`text-lg py-3 pr-12 ${
+              isSubmitted && evaluation 
+                ? `border-2 ${evaluation.score >= 3 ? 'border-green-500' : 'border-red-500'}`
+                : 'border-gray-300'
+            }`}
           />
-          
-          {/* Индикатор оценки */}
-          <AnimatePresence>
-            {isEvaluating && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.8 }}
-                className="absolute inset-0 flex items-center justify-center bg-white bg-opacity-90 rounded-md"
-              >
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+          {isEvaluating && (
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
+            </div>
+          )}
         </div>
 
-        {/* Подсказки */}
-        <div className="flex flex-wrap gap-2 justify-center">
+        {/* Кнопки подсказок и отправки */}
+        <div className="flex flex-wrap gap-3">
+          {/* Кнопка подсказки длины */}
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => handleHint('length')}
             disabled={disabled || isSubmitted || hints.some(h => h.type === 'length')}
-            className="flex items-center space-x-1"
+            className="flex items-center space-x-2"
           >
             <LightBulbIcon className="h-4 w-4" />
             <span>Длина</span>
             {lengthHint && <Badge variant="secondary" className="ml-1">✓</Badge>}
           </Button>
-          
+
+          {/* Кнопка подсказки первой буквы */}
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => handleHint('first_letter')}
             disabled={disabled || isSubmitted || hints.some(h => h.type === 'first_letter')}
-            className="flex items-center space-x-1"
+            className="flex items-center space-x-2"
           >
-            <QuestionMarkCircleIcon className="h-4 w-4" />
+            <LightBulbIcon className="h-4 w-4" />
             <span>Первая буква</span>
             {firstLetterHint && <Badge variant="secondary" className="ml-1">✓</Badge>}
           </Button>
-        </div>
 
-        {/* Отображение полученных подсказок */}
-        {(lengthHint || firstLetterHint) && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-            <div className="text-sm text-yellow-800">
-              <strong>Подсказки:</strong>
-              {lengthHint && <div>• Длина: {lengthHint}</div>}
-              {firstLetterHint && <div>• Первая буква: {firstLetterHint}</div>}
-            </div>
-          </div>
-        )}
-
-        {/* Кнопка отправки */}
-        {!isSubmitted && (
+          {/* Кнопка отправки */}
           <Button
             type="submit"
-            className="w-full"
-            disabled={!userInput.trim() || disabled}
+            disabled={!userInput.trim() || isEvaluating || isSubmitted || disabled}
+            className="ml-auto"
           >
-            Проверить
+            {isEvaluating ? 'Проверка...' : 'Проверить'}
           </Button>
-        )}
+        </div>
       </form>
 
       {/* Результат оценки */}
@@ -360,44 +425,53 @@ export function TranslationInput({
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="space-y-4"
           >
-            <Card className={`border-2 ${evaluation.score >= 3 ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
-              <CardContent className="p-6 text-center">
-                <div className="flex items-center justify-center space-x-2 mb-3">
-                  {evaluation.score >= 3 ? (
-                    <CheckCircleIcon className="h-8 w-8 text-green-600" />
-                  ) : (
-                    <XCircleIcon className="h-8 w-8 text-red-600" />
+            <Card className={`border-2 ${
+              evaluation.score >= 3 ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
+            }`}>
+              <CardContent className="p-4">
+                <div className="flex items-center space-x-3">
+                  <div className={`p-2 rounded-full ${getScoreColor(evaluation.score)}`}>
+                    {getScoreIcon(evaluation.score)}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center space-x-2">
+                      <span className="font-semibold">{getScoreText(evaluation.score)}</span>
+                      <Badge variant="outline">{evaluation.score}/4</Badge>
+                    </div>
+                    <div className="text-sm text-gray-600 mt-1">
+                      {evaluation.reason === 'exact' && 'Точный ответ'}
+                      {evaluation.reason === 'typo' && 'Есть опечатки'}
+                      {evaluation.reason === 'hint_used' && `Использовано подсказок: ${hints.length}`}
+                      {evaluation.reason === 'wrong' && `Правильный ответ: ${expectedAnswer}`}
+                    </div>
+                  </div>
+                  {evaluation.score < 3 && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRetry}
+                      className="shrink-0"
+                    >
+                      Попробовать еще
+                    </Button>
                   )}
-                  <Badge className={getScoreColor(evaluation.score)}>
-                    {getScoreText(evaluation.score)}
-                  </Badge>
-                </div>
-                
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p><strong>Ваш ответ:</strong> {userInput}</p>
-                  <p><strong>Правильный ответ:</strong> {expectedAnswer}</p>
-                  {hints.length > 0 && (
-                    <p><strong>Использовано подсказок:</strong> {hints.length}</p>
-                  )}
-                  <p><strong>Время:</strong> {timeSpent}с</p>
                 </div>
               </CardContent>
             </Card>
-
-            {evaluation.score < 3 && (
-              <Button
-                onClick={handleRetry}
-                variant="outline"
-                className="w-full"
-              >
-                Попробовать снова
-              </Button>
-            )}
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Показываем использованные подсказки */}
+      {hints.length > 0 && (
+        <div className="text-center">
+          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
+            <LightBulbIcon className="h-4 w-4" />
+            <span>Использовано подсказок: {hints.length}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
