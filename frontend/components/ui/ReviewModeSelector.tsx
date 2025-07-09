@@ -135,59 +135,71 @@ const handleModeSelect = (mode: ReviewMode) => {
 
         {/* Сетка режимов */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {REVIEW_MODES.map((mode) => {
+        {REVIEW_MODES.map((mode) => {
             const Icon = mode.icon;
             const isSelected = selectedMode === mode.id;
             const isDisabled = !mode.isAvailable;
             
             return (
-              <motion.div
+            <motion.div
                 key={mode.id}
                 whileHover={mode.isAvailable ? { scale: 1.02 } : {}}
                 whileTap={mode.isAvailable ? { scale: 0.98 } : {}}
-              >
-                <Card 
-                  className={`
+            >
+                {/* ОБЕРТКА */}
+                <div
+                className={`
                     cursor-pointer transition-all duration-200 relative
                     ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
-                    ${isDisabled ? 'opacity-50 cursor-not-allowed' : mode.color}
-                  `}
-                  onClick={() => handleModeSelect(mode.id)}
+                    ${isDisabled ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                onClick={() => {
+                    console.log('🖱️ Wrapper click for:', mode.id);
+                    handleModeSelect(mode.id);
+                }}
                 >
-                  <CardContent className="p-4">
+                <Card 
+                    className={`
+                    transition-all duration-200 relative
+                    ${isSelected ? 'ring-2 ring-blue-500 ring-offset-2' : ''}
+                    ${isDisabled ? 'opacity-50 cursor-not-allowed' : mode.color}
+                    `}
+                >
+                    <CardContent className="p-4">
                     <div className="flex items-start space-x-3">
-                      <div className={`
+                        <div className={`
                         p-2 rounded-lg shrink-0
                         ${isSelected ? 'bg-blue-500 text-white' : 'bg-white'}
-                      `}>
+                        `}>
                         <Icon className="h-5 w-5" />
-                      </div>
-                      
-                      <div className="flex-1 min-w-0">
+                        </div>
+                        
+                        <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-medium text-gray-900">
+                            <h3 className="font-medium text-gray-900">
                             {mode.name}
-                          </h3>
-                          {mode.badge && (
+                            </h3>
+                            {mode.badge && (
                             <Badge 
-                              variant={mode.badge === 'Новое' ? 'default' : 'secondary'}
-                              className="text-xs"
+                                variant={mode.badge === 'Новое' ? 'default' : 'secondary'}
+                                className="text-xs"
                             >
-                              {mode.badge}
+                                {mode.badge}
                             </Badge>
-                          )}
+                            )}
                         </div>
                         
                         <p className="text-sm text-gray-600 leading-relaxed">
-                          {mode.description}
+                            {mode.description}
                         </p>
-                      </div>
+                        </div>
                     </div>
-                  </CardContent>
+                    </CardContent>
                 </Card>
-              </motion.div>
+                </div>
+            </motion.div>
             );
-          })}
+        })}
         </div>
 
         {/* Кнопки действий */}
