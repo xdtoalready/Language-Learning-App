@@ -45,7 +45,8 @@ export default function ReviewPage() {
     remainingWords,
     createReviewSession,
     submitReviewInSession,
-    endSessionNew
+    endSessionNew,
+    isSessionCompleted
   } = useReview();
 
   // Состояние для режима Recognition
@@ -55,6 +56,7 @@ export default function ReviewPage() {
   const [sessionStats, setSessionStats] = useState({
     total: 0,
     correct: 0,
+    totalWords: 0,
     ratings: { 1: 0, 2: 0, 3: 0, 4: 0 }
   });
 
@@ -66,8 +68,8 @@ export default function ReviewPage() {
   const urlSessionType = searchParams.get('sessionType') as 'daily' | 'training' || 'daily';
   const urlMode = searchParams.get('mode') as ReviewMode || 'RECOGNITION';
 
-  // ✅ ИСПРАВЛЕННАЯ инициализация сессии с защитой от двойных вызовов
-  useEffect(() => {
+  // инициализация сессии
+useEffect(() => {
     if (!isAuthenticated) {
       router.push('/auth');
       return;
@@ -96,8 +98,20 @@ export default function ReviewPage() {
       sessionCreatedRef.current = true;
       
       createReviewSession(urlMode, urlSessionType)
-        .then(() => {
+        .then((response) => {
           console.log('✅ Сессия успешно создана');
+          
+          // ✅ ИСПРАВЛЕНИЕ: инициализируем статистику с данными из API
+          if (response?.session) {
+            const totalWords = response.remainingWords + 1; // +1 для текущего слова
+            setSessionStats(prev => ({
+              ...prev,
+              totalWords,
+              total: 0,
+              correct: 0
+            }));
+            console.log('📊 Инициализация статистики:', { totalWords });
+          }
         })
         .catch((error) => {
           console.error('❌ Ошибка создания сессии:', error);
@@ -108,10 +122,10 @@ export default function ReviewPage() {
           isCreatingSession.current = false;
         });
     }
-  }, [isAuthenticated]); // ✅ Убираем лишние зависимости
+  }, [isAuthenticated]);
 
-  // ✅ Сброс флагов при смене сессии (для возможности создания новой)
-  useEffect(() => {
+  // Сброс флагов при смене сессии
+useEffect(() => {
     if (!currentSession && !isReviewSession) {
       sessionCreatedRef.current = false;
       isCreatingSession.current = false;
@@ -126,7 +140,7 @@ export default function ReviewPage() {
       return false;
     }
 
-    if (!currentReviewWord) {
+    if (!currentReviewWord && !isSessionCompleted) {
       console.error('❌ Нет текущего слова');
       toast.error('Слово не загружено. Попробуйте еще раз.');
       return false;
@@ -134,19 +148,22 @@ export default function ReviewPage() {
 
     console.log('✅ Валидация сессии прошла:', {
       sessionId: currentSession.sessionId,
-      wordId: currentReviewWord.id,
-      word: currentReviewWord.word
+      wordId: currentReviewWord?.id,
+      word: currentReviewWord?.word,
+      isCompleted: isSessionCompleted
     });
 
     return true;
   };
 
   // Обработка оценки для режима Recognition
-  const handleSubmitRating = async (rating: number) => {
+const handleSubmitRating = async (rating: number) => {
     if (!currentReviewWord || !currentSession) return;
 
     try {
+      // ✅ ИСПРАВЛЕНИЕ: обновляем статистику ПЕРЕД отправкой
       setSessionStats(prev => ({
+        ...prev,
         total: prev.total + 1,
         correct: prev.correct + (rating >= 3 ? 1 : 0),
         ratings: {
@@ -160,7 +177,7 @@ export default function ReviewPage() {
         rating,
         reviewMode: 'RECOGNITION',
         direction: currentDirection,
-        timeSpent: 0 // В режиме Recognition время не засекается
+        timeSpent: 0
       });
 
       setShowTranslation(false);
@@ -168,11 +185,22 @@ export default function ReviewPage() {
     } catch (error) {
       console.error('❌ Ошибка отправки оценки:', error);
       toast.error('Ошибка при сохранении результата');
+      
+      // Откатываем статистику при ошибке
+      setSessionStats(prev => ({
+        ...prev,
+        total: Math.max(0, prev.total - 1),
+        correct: prev.correct - (rating >= 3 ? 1 : 0),
+        ratings: {
+          ...prev.ratings,
+          [rating]: Math.max(0, prev.ratings[rating as keyof typeof prev.ratings] - 1)
+        }
+      }));
     }
   };
 
   // ✅ ИСПРАВЛЕННАЯ обработка ввода для режимов Translation/Reverse
-  const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
+const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
     if (!validateSession()) return;
 
     try {
@@ -197,16 +225,26 @@ export default function ReviewPage() {
 
       console.log('✅ Ответ получен:', response);
 
-      // ✅ Проверяем результат после отправки
-      if (response.completed || !response.hasMoreWords) {
+      // ✅ ИСПРАВЛЕНИЕ: проверяем завершение через новое поле
+      if (response.completed || !response.hasMoreWords || isSessionCompleted) {
         console.log('🏁 Сессия завершена, переходим к результатам');
-        // Не обновляем статистику, если сессия завершена
+        // Обновляем статистику для завершенного слова
+        setSessionStats(prev => ({
+          ...prev,
+          total: prev.total + 1,
+          correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
+          ratings: {
+            ...prev.ratings,
+            [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
+          }
+        }));
         return;
       }
 
       // Обновляем статистику только если есть следующее слово
       if (response.currentWord) {
         setSessionStats(prev => ({
+          ...prev,
           total: prev.total + 1,
           correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
           ratings: {
@@ -219,7 +257,6 @@ export default function ReviewPage() {
     } catch (error) {
       console.error('❌ Ошибка отправки перевода:', error);
       
-      // Проверяем тип ошибки
       if (error instanceof Error && error.message.includes('Session not found')) {
         toast.error('Сессия истекла. Создаем новую сессию...');
         router.push('/dashboard');
@@ -273,10 +310,26 @@ export default function ReviewPage() {
   // ✅ Улучшенная проверка состояния загрузки
   const isLoading = isCreatingSession.current || 
                    (!isReviewSession && sessionCreatedRef.current) ||
-                   (!currentReviewWord && hasMoreWords);
+                   (!currentReviewWord && hasMoreWords && !isSessionCompleted);
 
   // ✅ Проверка завершения с улучшенной логикой
-  const isCompleted = isReviewSession && !hasMoreWords && !isLoading;
+  const isCompleted = isSessionCompleted || (!hasMoreWords && isReviewSession && !isLoading);
+
+    const getProgress = () => {
+    if (sessionStats.totalWords === 0) return 0;
+    
+    const currentProgress = (sessionStats.total / sessionStats.totalWords) * 100;
+    const clampedProgress = Math.min(Math.max(currentProgress, 0), 100);
+    
+    console.log('📊 Прогресс:', {
+      total: sessionStats.total,
+      totalWords: sessionStats.totalWords,
+      progress: clampedProgress,
+      remainingWords
+    });
+    
+    return clampedProgress;
+  };
 
   // Если не аутентифицирован, показываем загрузку
   if (!isAuthenticated) {
@@ -304,9 +357,16 @@ export default function ReviewPage() {
     );
   }
 
-  // ✅ Результаты сессии (показываем только когда действительно завершено)
+  // Результаты сессии
   if (isCompleted) {
     const ModeIcon = getModeIcon();
+    
+    console.log('🎉 Показываем результаты:', {
+      isSessionCompleted,
+      hasMoreWords,
+      isReviewSession,
+      sessionStats
+    });
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
@@ -424,12 +484,11 @@ export default function ReviewPage() {
               Прогресс
             </span>
             <span className="text-sm text-gray-500">
-              {remainingWords} из {(sessionStats.total || 0) + remainingWords} слов
+              {sessionStats.total} из {sessionStats.totalWords} слов
             </span>
           </div>
           <ProgressBar 
-            progress={sessionStats.total === 0 ? 0 : 
-              (sessionStats.total / ((sessionStats.total || 0) + remainingWords)) * 100} 
+            progress={getProgress()} 
             className="h-2"
           />
         </div>

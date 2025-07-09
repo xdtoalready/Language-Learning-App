@@ -479,7 +479,6 @@ submitReviewInSession: async (data: {
       sessionId: state.currentSession.sessionId,
       wordId: data.wordId,
       userInput: data.userInput,
-      hintsUsed: data.hintsUsed,
       reviewMode: data.reviewMode || state.reviewMode,
       direction: data.direction || state.currentDirection
     });
@@ -511,22 +510,17 @@ submitReviewInSession: async (data: {
       currentRound: response.currentRound
     });
     
-    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: правильное обновление состояния
+    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НЕ сбрасываем isReviewSession при завершении
     const newState = {
       currentReviewWord: nextWord || null,
       hasMoreWords: hasMore,
       remainingWords: remaining,
       hintsUsed: 0, // сброс для следующего слова
       currentRound: response.currentRound || state.currentRound,
-      currentDirection: nextWord?.direction || state.currentDirection
+      currentDirection: nextWord?.direction || state.currentDirection,
+      // ✅ Добавляем флаг завершения вместо сброса isReviewSession
+      isSessionCompleted: completed || !hasMore
     };
-
-    // Если сессия завершена, обновляем соответствующие флаги
-    if (completed || !hasMore) {
-      console.log('🏁 Сессия завершена - обновляем флаги');
-      newState.isReviewSession = false;
-      // НЕ удаляем currentSession сразу - он нужен для отображения результатов
-    }
 
     console.log('🔄 Обновляем состояние:', newState);
     set(newState);
@@ -545,7 +539,8 @@ submitReviewInSession: async (data: {
         currentSession: null,
         currentReviewWord: null,
         hasMoreWords: false,
-        remainingWords: 0
+        remainingWords: 0,
+        isSessionCompleted: false
       });
     }
     
@@ -649,7 +644,7 @@ endSessionNew: async () => {
     
     const response = await apiClient.endSession(state.currentSession.sessionId);
     
-    // Полная очистка состояния сессии
+    // ✅ ИСПРАВЛЕНИЕ: полная очистка состояния только при ручном завершении
     set({
       isReviewSession: false,
       currentSession: null,
@@ -660,11 +655,12 @@ endSessionNew: async () => {
       currentRound: 1,
       reviewMode: undefined,
       currentDirection: 'LEARNING_TO_NATIVE',
-      sessionType: undefined
+      sessionType: undefined,
+      isSessionCompleted: false
     });
     
-    console.log('✅ Сессия завершена, состояние очищено:', response.sessionStats);
-    return response.sessionStats;
+    console.log('✅ Сессия завершена вручную, состояние очищено:', response?.sessionStats);
+    return response?.sessionStats || null;
   } catch (error) {
     console.error('❌ Ошибка завершения сессии:', error);
     
@@ -676,7 +672,8 @@ endSessionNew: async () => {
       hasMoreWords: false,
       remainingWords: 0,
       hintsUsed: 0,
-      currentRound: 1
+      currentRound: 1,
+      isSessionCompleted: false
     });
     
     throw error;
