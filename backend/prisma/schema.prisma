@@ -50,6 +50,10 @@ model Word {
   lastReviewDate  DateTime @default(now())
   nextReviewDate  DateTime @default(now())
   
+  // Новые поля для режимов тренировки
+  inputHistory    Json?    // История ввода: {correct: number, attempts: number, lastScore: number}
+  synonyms        String[] @default([]) // Дополнительные варианты перевода
+  
   // Связи
   userId          String
   user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -65,6 +69,13 @@ model Review {
   id       String @id @default(cuid())
   rating   Int    // 1-4 (согласно ТЗ)
   
+  // Новые поля для разных режимов
+  reviewMode     ReviewMode @default(RECOGNITION)
+  direction      ReviewDirection @default(LEARNING_TO_NATIVE) // с изучаемого на родной
+  userInput      String?    // Что ввел пользователь (для режимов ввода)
+  hintsUsed      Int        @default(0) // Количество использованных подсказок
+  timeSpent      Int?       // Время в секундах
+  
   // Связи
   wordId   String
   word     Word   @relation(fields: [wordId], references: [id], onDelete: Cascade)
@@ -76,13 +87,27 @@ model Review {
   @@map("reviews")
 }
 
+// Режимы тренировки
+enum ReviewMode {
+  RECOGNITION        // Узнавание (текущий)
+  TRANSLATION_INPUT  // Ввод перевода (с изучаемого на русский)
+  REVERSE_INPUT     // Обратный ввод (с русского на изучаемый)
+  MIXED             // Смешанный режим
+}
+
+// Направление перевода
+enum ReviewDirection {
+  LEARNING_TO_NATIVE  // с изучаемого языка на родной (корейский → русский)
+  NATIVE_TO_LEARNING  // с родного на изучаемый (русский → корейский)
+}
+
 model Friendship {
   id       String @id @default(cuid())
   
   userId   String
   user     User   @relation("UserFriends", fields: [userId], references: [id], onDelete: Cascade)
   
-  cloudStreak  CloudStreak? // Связь с облачком (один к одному)
+  cloudStreak  CloudStreak?
   
   friendId String
   friend   User   @relation("FriendOfUser", fields: [friendId], references: [id], onDelete: Cascade)
