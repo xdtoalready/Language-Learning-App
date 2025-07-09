@@ -1,4 +1,5 @@
-// components/ui/ProgressBar.tsx
+// components/ui/ProgressBar.tsx - ИСПРАВЛЕНИЯ
+
 import { cn } from '@/lib/utils';
 
 interface ProgressBarProps {
@@ -37,40 +38,66 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     red: 'bg-red-500'
   };
 
-  // Если используется режим отображения прогресса сессии
+  //  Улучшенная логика для отображения прогресса сессии
   if (showSessionProgress && currentSession) {
     const totalWords = currentSession.totalWords || 0;
-    const completedWords = totalWords - remainingWords;
-    const progressPercentage = totalWords > 0 ? Math.round((completedWords / totalWords) * 100) : 0;
+    
+    //  Правильный расчет завершенных слов
+    const completedWords = Math.max(0, totalWords - remainingWords);
+    
+    //  Защита от деления на ноль
+    const progressPercentage = totalWords > 0 
+      ? Math.min(100, Math.max(0, Math.round((completedWords / totalWords) * 100)))
+      : 0;
 
     return (
       <div className={cn('w-full', className)}>
         {/* Информация о раунде для TRANSLATION_INPUT */}
-        {reviewMode === 'TRANSLATION_INPUT' && (
+        {reviewMode === 'TRANSLATION_INPUT' && totalWords > 0 && (
           <div className="text-center text-sm text-gray-500 mb-2">
             Раунд {currentRound}/2
           </div>
         )}
         
-        {/* Текст прогресса */}
-        <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
-          <span>{completedWords} из {totalWords}</span>
-          <span>{progressPercentage}%</span>
-        </div>
-        
-        {/* Прогресс-бар */}
-        <div className="w-full bg-gray-200 rounded-full h-2">
-          <div 
-            className={cn('h-2 rounded-full transition-all duration-300', colors[color])}
-            style={{ width: `${progressPercentage}%` }}
-          />
-        </div>
+        {/* Показываем прогресс только если есть слова */}
+        {totalWords > 0 ? (
+          <>
+            {/* Текст прогресса */}
+            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+              <span>{completedWords} из {totalWords}</span>
+              <span>{progressPercentage}%</span>
+            </div>
+            
+            {/* Прогресс-бар */}
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={cn('h-2 rounded-full transition-all duration-300', colors[color])}
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+          </>
+        ) : (
+          // Для пустых сессий показываем соответствующий индикатор
+          <>
+            <div className="flex items-center justify-between text-sm text-gray-600 mb-2">
+              <span>Нет слов для отображения</span>
+              <span>-</span>
+            </div>
+            
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={cn('h-2 rounded-full transition-all duration-300', 'bg-gray-400')}
+                style={{ width: '0%' }}
+              />
+            </div>
+          </>
+        )}
       </div>
     );
   }
 
-  // Стандартный режим (как было раньше)
-  const percentage = Math.min(100, Math.max(0, (value / max) * 100));
+  // ✅ Стандартный режим (как было раньше) с улучшенной защитой
+  const percentage = Math.min(100, Math.max(0, max > 0 ? (value / max) * 100 : 0));
 
   return (
     <div className={cn('w-full', className)}>

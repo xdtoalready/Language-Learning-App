@@ -67,71 +67,83 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
     const userId = req.userId!;
     const { mode, sessionType, filterBy }: CreateSessionRequest = req.body;
 
-    // Валидация
+    // Валидация входных данных
     if (!mode || !sessionType) {
-      res.status(400).json({ 
-        error: 'Mode and sessionType are required' 
-      });
+      res.status(400).json({ error: 'mode and sessionType are required' });
       return;
     }
 
-    const validModes: ReviewMode[] = ['RECOGNITION', 'TRANSLATION_INPUT', 'REVERSE_INPUT', 'MIXED'];
-    if (!validModes.includes(mode)) {
-      res.status(400).json({ 
-        error: 'Invalid review mode' 
-      });
-      return;
-    }
+    console.log(`Creating ${sessionType} session for user ${userId} with mode ${mode}`);
 
-    // Формируем запрос для получения слов
-    const where: any = { userId };
-
+    // Получаем слова в зависимости от типа сессии
+    let words: any[];
+    
     if (sessionType === 'daily') {
-      // Ежедневные слова: готовые к повторению
-      where.masteryLevel = { lt: 5 };
-      where.nextReviewDate = { lte: new Date() };
-    } else if (sessionType === 'training') {
-      // Тренировочные слова: активные (в изучении)
-      if (filterBy?.onlyActive) {
-        where.masteryLevel = { lt: 5 };
-      }
-      
-      if (filterBy?.tags && filterBy.tags.length > 0) {
+      // Для ежедневных повторений - только слова, готовые к повторению
+      words = await prisma.word.findMany({
+        where: {
+          userId,
+          masteryLevel: { lt: 5 }, // не выученные
+          nextReviewDate: { lte: new Date() } // готовые к повторению
+        },
+        orderBy: { nextReviewDate: 'asc' },
+        take: 20,
+        select: {
+          id: true,
+          word: true,
+          translation: true,
+          transcription: true,
+          example: true,
+          tags: true,
+          synonyms: true,
+          masteryLevel: true
+        }
+      });
+    } else {
+      // Для тренировочного полигона - активные слова с фильтрацией
+      const where: any = {
+        userId,
+        masteryLevel: { lt: 5 }
+      };
+
+      if (filterBy?.tags?.length) {
         where.tags = { hasSome: filterBy.tags };
       }
-      
-      if (filterBy?.masteryLevel && filterBy.masteryLevel.length > 0) {
+
+      if (filterBy?.masteryLevel?.length) {
         where.masteryLevel = { in: filterBy.masteryLevel };
       }
+
+      words = await prisma.word.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: filterBy?.limit || 20,
+        select: {
+          id: true,
+          word: true,
+          translation: true,
+          transcription: true,
+          example: true,
+          tags: true,
+          synonyms: true,
+          masteryLevel: true
+        }
+      });
     }
 
-    // Получаем слова
-    const words = await prisma.word.findMany({
-      where,
-      orderBy: sessionType === 'daily' 
-        ? [{ nextReviewDate: 'asc' }, { createdAt: 'asc' }]
-        : [{ createdAt: 'desc' }],
-      take: sessionType === 'daily' ? 50 : 20, // ограничиваем количество
-      select: {
-        id: true,
-        word: true,
-        translation: true,
-        transcription: true,
-        example: true,
-        tags: true,
-        synonyms: true,
-        masteryLevel: true
-      }
-    });
-
+    // ✅ ИСПРАВЛЕНИЕ: Правильная обработка пустого списка слов
     if (words.length === 0) {
+      console.log(`No words found for ${sessionType} session`);
+      
+      // ✅ Возвращаем структурированный ответ для пустой сессии
       res.json({
-        session: null,
+        session: null, // ✅ Явно указываем что сессии нет
         currentWord: null,
         hasMore: false,
-        hasMoreWords: false, // ✅ Добавляем альтернативное название
+        hasMoreWords: false,
         remaining: 0,
-        remainingWords: 0, // ✅ Добавляем альтернативное название
+        remainingWords: 0,
+        completed: true, // ✅ Указываем что "сессия" завершена (т.к. слов нет)
         message: sessionType === 'daily' 
           ? 'No words due for review today' 
           : 'No words found for training'
@@ -139,7 +151,7 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
       return;
     }
 
-    // Создаем сессию
+    // ✅ Создаем сессию только если есть слова
     const sessionId = `session_${userId}_${Date.now()}`;
     
     // Подготавливаем слова для сессии
@@ -184,6 +196,21 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
       }));
     }
 
+    // Убеждаемся что у нас есть слова после обработки
+    if (sessionWords.length === 0) {
+      res.json({
+        session: null,
+        currentWord: null,
+        hasMore: false,
+        hasMoreWords: false,
+        remaining: 0,
+        remainingWords: 0,
+        completed: true,
+        message: 'No words available after processing'
+      });
+      return;
+    }
+
     // Сохраняем сессию
     activeSessions.set(sessionId, {
       sessionId,
@@ -208,21 +235,24 @@ export const createReviewSession = async (req: AuthRequest, res: Response): Prom
     const remainingCount = sessionWords.length - 1; // слов осталось после первого
     const hasMoreWords = sessionWords.length > 1;
     
+    // Возвращаем правильную структуру ответа
     res.json({
       session: {
         sessionId,
         mode,
         sessionType,
-        currentRound: mode === 'TRANSLATION_INPUT' ? (currentWord.direction === 'LEARNING_TO_NATIVE' ? 1 : 2) : 1,
-        currentWordIndex: 0,
         totalWords: sessionWords.length,
+        currentRound: mode === 'TRANSLATION_INPUT' ?
+          (currentWord.direction === 'LEARNING_TO_NATIVE' ? 1 : 2) : 1,
+        currentWordIndex: 0,
         startTime: new Date().toISOString()
       },
       currentWord,
       hasMore: hasMoreWords,
       hasMoreWords: hasMoreWords,
       remaining: remainingCount,
-      remainingWords: remainingCount
+      remainingWords: remainingCount,
+      completed: false // При создании сессии она НЕ завершена
     });
 
   } catch (error) {
@@ -248,7 +278,14 @@ export const getCurrentWord = async (req: AuthRequest, res: Response): Promise<v
 
     const currentWord = session.words[session.currentWordIndex];
     
-    if (!currentWord) {
+    // Правильная обработка завершения сессии
+    if (!currentWord || session.currentWordIndex >= session.words.length) {
+      // Сессия завершена - возвращаем статистику
+      const stats = session.stats;
+      
+      // Удаляем сессию из памяти при завершении
+      activeSessions.delete(sessionId);
+      
       res.json({
         currentWord: null,
         hasMore: false,
@@ -256,7 +293,7 @@ export const getCurrentWord = async (req: AuthRequest, res: Response): Promise<v
         remaining: 0,
         remainingWords: 0,
         completed: true,
-        sessionStats: session.stats
+        sessionStats: stats
       });
       return;
     }
@@ -266,11 +303,11 @@ export const getCurrentWord = async (req: AuthRequest, res: Response): Promise<v
 
     res.json({
       currentWord,
-      // ✅ Возвращаем ОБА варианта названий для совместимости
       hasMore: hasMoreWords,
       hasMoreWords: hasMoreWords,
       remaining: remainingCount,
       remainingWords: remainingCount,
+      completed: false,
       sessionInfo: {
         sessionId,
         mode: session.mode,
@@ -607,13 +644,27 @@ export const endSession = async (req: AuthRequest, res: Response): Promise<void>
       return;
     }
 
-    // Удаляем сессию
+    // Получаем финальную статистику
+    const finalStats = {
+      totalWords: session.stats.totalWords,
+      completed: session.stats.completed,
+      correct: session.stats.correct,
+      averageRating: session.stats.completed > 0 
+        ? session.stats.averageRating / session.stats.completed 
+        : 0,
+      totalTime: session.stats.totalTime,
+      sessionType: session.sessionType,
+      mode: session.mode
+    };
+
+    // Удаляем сессию из памяти
     activeSessions.delete(sessionId);
 
+    console.log(`Session ${sessionId} ended manually by user ${userId}`);
+
     res.json({
-      success: true,
-      sessionStats: session.stats,
-      message: 'Session ended successfully'
+      message: 'Session ended successfully',
+      sessionStats: finalStats
     });
 
   } catch (error) {

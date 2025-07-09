@@ -419,14 +419,54 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
   try {
     console.log('🔄 Создание сессии ревью:', { mode, sessionType, filters });
     
+    // Полная очистка состояния перед созданием новой сессии
+    set({
+      isReviewSession: false,
+      currentSession: null,
+      currentReviewWord: null,
+      hasMoreWords: false,
+      remainingWords: 0,
+      hintsUsed: 0,
+      currentRound: 1,
+      reviewMode: undefined,
+      currentDirection: 'LEARNING_TO_NATIVE',
+      sessionType: undefined,
+      isSessionCompleted: false
+    });
+    
     const response = await apiClient.createReviewSession({
       mode,
       sessionType,
       filterBy: filters
     });
     
-    // Проверяем корректность ответа
-    if (!response.session || !response.session.sessionId) {
+    // Правильная обработка пустых сессий
+    if (!response.session) {
+      // Если нет сессии (нет слов для повторения), не выбрасываем ошибку
+      console.log('ℹ️ Нет слов для повторения сегодня');
+      
+      set({
+        isReviewSession: false,
+        currentSession: null,
+        currentReviewWord: null,
+        hasMoreWords: false,
+        remainingWords: 0,
+        isSessionCompleted: true, // Показываем результат "нет слов"
+        sessionType,
+        reviewMode: mode
+      });
+      
+      return {
+        session: null,
+        currentWord: null,
+        hasMoreWords: false,
+        remainingWords: 0,
+        message: sessionType === 'daily' ? 'Нет слов для повторения сегодня' : 'Нет слов для тренировки'
+      };
+    }
+    
+    // Проверяем sessionId только если есть сессия
+    if (!response.session.sessionId) {
       throw new Error('Некорректный ответ от сервера: отсутствует sessionId');
     }
 
@@ -440,7 +480,9 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
       isReviewSession: true,
       currentReviewWord: response.currentWord,
       hasMoreWords: response.hasMoreWords ?? response.hasMore ?? false,
-      remainingWords: response.remainingWords ?? response.remaining ?? 0
+      remainingWords: response.remainingWords ?? response.remaining ?? 0,
+      // НЕ устанавливаем isSessionCompleted в true при создании
+      isSessionCompleted: false
     };
     
     console.log('✅ Устанавливаем состояние сессии:', sessionData);
@@ -456,9 +498,21 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
     return response;
   } catch (error) {
     console.error('❌ Ошибка создания сессии:', error);
+    
+    // ✅ При ошибке очищаем состояние
+    set({
+      isReviewSession: false,
+      currentSession: null,
+      currentReviewWord: null,
+      hasMoreWords: false,
+      remainingWords: 0,
+      isSessionCompleted: false
+    });
+    
     throw error;
   }
 },
+
 
 submitReviewInSession: async (data: {
   wordId: string;
@@ -492,7 +546,7 @@ submitReviewInSession: async (data: {
     
     console.log('🔄 Полный ответ от API:', response);
     
-    // Проверяем валидность ответа
+    // ✅ Проверяем валидность ответа
     if (!response || typeof response !== 'object') {
       throw new Error('Некорректный ответ от сервера');
     }
@@ -500,7 +554,7 @@ submitReviewInSession: async (data: {
     const nextWord = response.currentWord;
     const hasMore = response.hasMoreWords ?? response.hasMore ?? false;
     const remaining = response.remainingWords ?? response.remaining ?? 0;
-    const completed = response.completed ?? false;
+    const completed = response.completed ?? (!hasMore && !nextWord);
     
     console.log('📊 Обработанные данные:', {
       nextWord: nextWord?.word || 'null',
@@ -510,7 +564,7 @@ submitReviewInSession: async (data: {
       currentRound: response.currentRound
     });
     
-    // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НЕ сбрасываем isReviewSession при завершении
+    // ✅ ИСПРАВЛЕНИЕ: Правильное обновление состояния
     const newState = {
       currentReviewWord: nextWord || null,
       hasMoreWords: hasMore,
@@ -518,8 +572,8 @@ submitReviewInSession: async (data: {
       hintsUsed: 0, // сброс для следующего слова
       currentRound: response.currentRound || state.currentRound,
       currentDirection: nextWord?.direction || state.currentDirection,
-      // ✅ Добавляем флаг завершения вместо сброса isReviewSession
-      isSessionCompleted: completed || !hasMore
+      // ✅ Устанавливаем завершение только когда действительно больше нет слов
+      isSessionCompleted: completed
     };
 
     console.log('🔄 Обновляем состояние:', newState);
@@ -531,7 +585,7 @@ submitReviewInSession: async (data: {
   } catch (error) {
     console.error('❌ Ошибка отправки ревью:', error);
     
-    // Если ошибка 404 - сессия не найдена, очищаем состояние
+    // ✅ Если ошибка 404 - сессия не найдена, очищаем состояние
     if (error instanceof Error && error.message.includes('404')) {
       console.log('🔄 Сессия не найдена - очищаем состояние');
       set({
@@ -644,7 +698,7 @@ endSessionNew: async () => {
     
     const response = await apiClient.endSession(state.currentSession.sessionId);
     
-    // ✅ ИСПРАВЛЕНИЕ: полная очистка состояния только при ручном завершении
+    // ПОЛНАЯ очистка состояния
     set({
       isReviewSession: false,
       currentSession: null,
@@ -656,15 +710,16 @@ endSessionNew: async () => {
       reviewMode: undefined,
       currentDirection: 'LEARNING_TO_NATIVE',
       sessionType: undefined,
-      isSessionCompleted: false
+      isSessionCompleted: false, // Сбрасываем флаг завершения
+      // Добавляем сброс всех связанных полей
+      currentWord: null
     });
     
-    console.log('✅ Сессия завершена вручную, состояние очищено:', response?.sessionStats);
+    console.log('✅ Сессия завершена вручную, состояние ПОЛНОСТЬЮ очищено:', response?.sessionStats);
     return response?.sessionStats || null;
   } catch (error) {
     console.error('❌ Ошибка завершения сессии:', error);
     
-    // В любом случае очищаем состояние при ошибке
     set({
       isReviewSession: false,
       currentSession: null,
@@ -673,7 +728,11 @@ endSessionNew: async () => {
       remainingWords: 0,
       hintsUsed: 0,
       currentRound: 1,
-      isSessionCompleted: false
+      reviewMode: undefined,
+      currentDirection: 'LEARNING_TO_NATIVE',
+      sessionType: undefined,
+      isSessionCompleted: false,
+      currentWord: null
     });
     
     throw error;

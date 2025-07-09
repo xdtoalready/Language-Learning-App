@@ -70,59 +70,70 @@ export default function ReviewPage() {
 
   // инициализация сессии
 useEffect(() => {
-    if (!isAuthenticated) {
-      router.push('/auth');
-      return;
-    }
+  if (!isAuthenticated) {
+    router.push('/auth');
+    return;
+  }
 
-    // Защита от повторного создания сессии
-    if (sessionCreatedRef.current || isCreatingSession.current) {
-      console.log('🛡️ Защита: сессия уже создается или создана');
-      return;
-    }
+  // Защита от повторного создания сессии
+  if (sessionCreatedRef.current || isCreatingSession.current) {
+    console.log('🛡️ Защита: сессия уже создается или создана');
+    return;
+  }
 
-    // Создаем сессию только если её нет И есть параметры URL
-    const shouldCreateSession = !isReviewSession && 
-                                !currentSession && 
-                                (searchParams.get('sessionType') || searchParams.get('mode'));
+  // Создаем сессию только если её действительно нет
+  const shouldCreateSession = !currentSession && 
+                              !isReviewSession && 
+                              (searchParams.get('sessionType') || searchParams.get('mode'));
 
-    if (shouldCreateSession) {
-      console.log('🔄 ReviewPage: Создание новой сессии...', {
-        sessionType: urlSessionType,
-        mode: urlMode,
-        hasCurrentSession: !!currentSession,
-        isReviewSession
+  if (shouldCreateSession) {
+    console.log('🔄 ReviewPage: Создание новой сессии...', {
+      sessionType: urlSessionType,
+      mode: urlMode,
+      hasCurrentSession: !!currentSession,
+      isReviewSession
+    });
+    
+    isCreatingSession.current = true;
+    sessionCreatedRef.current = true;
+    
+    createReviewSession(urlMode, urlSessionType)
+      .then((response) => {
+        console.log('✅ Сессия успешно создана');
+        
+        // Правильная инициализация статистики
+        if (response?.session && response.session.sessionId) {
+          // Для полноценной сессии
+          const totalWords = response.session.totalWords || 
+                           (response.remainingWords + (response.currentWord ? 1 : 0));
+          setSessionStats(prev => ({
+            ...prev,
+            totalWords,
+            total: 0,
+            correct: 0
+          }));
+          console.log('📊 Инициализация статистики для полной сессии:', { totalWords });
+        } else {
+          // Для пустой сессии (нет слов для повторения)
+          setSessionStats(prev => ({
+            ...prev,
+            totalWords: 0,
+            total: 0,
+            correct: 0
+          }));
+          console.log('📊 Инициализация статистики для пустой сессии');
+        }
+      })
+      .catch((error) => {
+        console.error('❌ Ошибка создания сессии:', error);
+        toast.error('Не удалось создать сессию повторения');
+        router.push('/dashboard');
+      })
+      .finally(() => {
+        isCreatingSession.current = false;
       });
-      
-      isCreatingSession.current = true;
-      sessionCreatedRef.current = true;
-      
-      createReviewSession(urlMode, urlSessionType)
-        .then((response) => {
-          console.log('✅ Сессия успешно создана');
-          
-          // ✅ ИСПРАВЛЕНИЕ: инициализируем статистику с данными из API
-          if (response?.session) {
-            const totalWords = response.remainingWords + 1; // +1 для текущего слова
-            setSessionStats(prev => ({
-              ...prev,
-              totalWords,
-              total: 0,
-              correct: 0
-            }));
-            console.log('📊 Инициализация статистики:', { totalWords });
-          }
-        })
-        .catch((error) => {
-          console.error('❌ Ошибка создания сессии:', error);
-          toast.error('Не удалось создать сессию повторения');
-          router.push('/dashboard');
-        })
-        .finally(() => {
-          isCreatingSession.current = false;
-        });
-    }
-  }, [isAuthenticated]);
+  }
+}, [isAuthenticated, currentSession, isReviewSession]);
 
   // Сброс флагов при смене сессии
 useEffect(() => {
@@ -307,29 +318,31 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
     }
   };
 
-  // ✅ Улучшенная проверка состояния загрузки
-  const isLoading = isCreatingSession.current || 
-                   (!isReviewSession && sessionCreatedRef.current) ||
-                   (!currentReviewWord && hasMoreWords && !isSessionCompleted);
+  // проверка состояния загрузки
+    const isLoading = isCreatingSession.current || 
+                 (sessionCreatedRef.current && !currentSession && !isSessionCompleted) ||
+                 (!currentReviewWord && hasMoreWords && !isSessionCompleted);
 
-  // ✅ Проверка завершения с улучшенной логикой
-  const isCompleted = isSessionCompleted || (!hasMoreWords && isReviewSession && !isLoading);
+  // Проверка завершения с улучшенной логикой
+const isCompleted = isSessionCompleted || 
+                   (!hasMoreWords && isReviewSession && !isLoading && sessionCreatedRef.current);
 
-    const getProgress = () => {
-    if (sessionStats.totalWords === 0) return 0;
-    
-    const currentProgress = (sessionStats.total / sessionStats.totalWords) * 100;
-    const clampedProgress = Math.min(Math.max(currentProgress, 0), 100);
-    
-    console.log('📊 Прогресс:', {
-      total: sessionStats.total,
-      totalWords: sessionStats.totalWords,
-      progress: clampedProgress,
-      remainingWords
-    });
-    
-    return clampedProgress;
-  };
+const getProgress = () => {
+  if (sessionStats.totalWords === 0) return 0;
+  
+  // Используем правильную формулу для прогресса
+  const currentProgress = (sessionStats.total / sessionStats.totalWords) * 100;
+  const clampedProgress = Math.min(Math.max(currentProgress, 0), 100);
+  
+  console.log('📊 Прогресс:', {
+    total: sessionStats.total,
+    totalWords: sessionStats.totalWords,
+    progress: clampedProgress,
+    remainingWords
+  });
+  
+  return clampedProgress;
+};
 
   // Если не аутентифицирован, показываем загрузку
   if (!isAuthenticated) {
@@ -358,15 +371,19 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
   }
 
   // Результаты сессии
-  if (isCompleted) {
-    const ModeIcon = getModeIcon();
-    
-    console.log('🎉 Показываем результаты:', {
-      isSessionCompleted,
-      hasMoreWords,
-      isReviewSession,
-      sessionStats
-    });
+ if (isCompleted) {
+  const ModeIcon = getModeIcon();
+  
+  console.log('🎉 Показываем результаты:', {
+    isSessionCompleted,
+    hasMoreWords,
+    isReviewSession,
+    sessionStats,
+    currentSession: !!currentSession
+  });
+  
+  // ИСПРАВЛЕНИЕ: Проверяем, есть ли вообще слова
+// const hasWordsToShow = sessionStats.totalWords > 0;
     
     return (
       <div className="min-h-screen bg-gradient-to-b from-green-50 to-white">
@@ -479,18 +496,25 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
 
         {/* Прогресс */}
         <div className="mb-8">
-          <div className="flex justify-between items-center mb-2">
-            <span className="text-sm font-medium text-gray-700">
-              Прогресс
-            </span>
-            <span className="text-sm text-gray-500">
-              {sessionStats.total} из {sessionStats.totalWords} слов
-            </span>
-          </div>
-          <ProgressBar 
-            progress={getProgress()} 
-            className="h-2"
-          />
+            <div className="flex justify-between items-center mb-2">
+                <span className="text-sm font-medium text-gray-700">
+                Прогресс
+                </span>
+                <span className="text-sm text-gray-500">
+                {sessionStats.total} из {sessionStats.totalWords} слов
+                </span>
+            </div>
+            <ProgressBar 
+                value={getProgress()}
+                max={100}
+                className="h-2"
+                color="blue"
+                showSessionProgress={true}
+                currentSession={currentSession}
+                remainingWords={remainingWords}
+                reviewMode={reviewMode}
+                currentRound={currentRound}
+            />
         </div>
 
         {/* Контент тренировки */}
