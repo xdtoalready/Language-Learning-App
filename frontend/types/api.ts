@@ -63,19 +63,25 @@ export interface Review {
 export interface ReviewSession {
   sessionId: string;
   mode: ReviewMode;
-  sessionType: 'daily' | 'training'; // ежедневные или тренировочные
-  currentRound: 1 | 2; // для двураундовых режимов
+  sessionType: 'daily' | 'training';
+  currentRound: number;
   currentWordIndex: number;
   totalWords: number;
   startTime: string;
-  words: ReviewSessionWord[];
 }
 
 // НОВОЕ: Слово в сессии ревью
-export interface ReviewSessionWord extends Word {
+export interface ReviewSessionWord {
+  id: string;
+  word: string;
+  translation: string;
+  transcription?: string;
+  example?: string;
+  tags: string[];
+  synonyms?: string[];
+  masteryLevel: number;
   direction: ReviewDirection;
-  isCompleted: boolean;
-  result?: ReviewResult;
+  isCompleted?: boolean;
 }
 
 // НОВОЕ: Результат ревью слова
@@ -255,18 +261,28 @@ export interface GetHintResponse {
 
 export interface ReviewSessionResponse {
   session?: ReviewSession;
-  currentWord?: ReviewSessionWord;
+  currentWord?: ReviewSessionWord;  // Убедитесь что это currentWord, а не nextWord
   hasMore: boolean;
+  hasMoreWords?: boolean; // альтернативное название из некоторых эндпоинтов
   remaining?: number;
+  remainingWords?: number; // альтернативное название
   message?: string;
-  completed?: boolean; // сессия завершена
+  completed?: boolean;
+  success?: boolean; // для ответов submitReview
+  evaluation?: {
+    score: number;
+    autoEvaluated: boolean;
+    userInput: string;
+    correctAnswer: string;
+  };
   sessionStats?: {
     totalWords: number;
-    correctAnswers: number;
+    completed: number;
+    correct: number;
     averageRating: number;
     totalTime: number;
-    modeBreakdown: Record<ReviewMode, number>;
   };
+  currentRound?: number; // для многораундовых режимов
 }
 
 // НОВОЕ: Ответ оценки ввода

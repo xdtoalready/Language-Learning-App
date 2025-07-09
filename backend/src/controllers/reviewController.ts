@@ -446,18 +446,18 @@ export const submitReview = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     res.json({
-      success: true,
-      evaluation: autoEvaluated ? {
+    success: true,
+    evaluation: autoEvaluated ? {
         score: finalRating,
         autoEvaluated: true,
         userInput,
         correctAnswer: direction === 'LEARNING_TO_NATIVE' ? word.translation : word.word
-      } : undefined,
-      nextWord,
-      hasMore,
-      remaining: hasMore ? session.words.length - session.currentWordIndex : 0,
-      sessionStats: session.stats,
-      completed: !hasMore
+    } : undefined,
+    currentWord: nextWord,
+    hasMore,
+    remaining: hasMore ? session.words.length - session.currentWordIndex : 0,
+    sessionStats: session.stats,
+    completed: !hasMore
     });
 
   } catch (error) {

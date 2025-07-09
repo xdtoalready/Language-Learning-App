@@ -63,26 +63,28 @@ export default function ReviewPage() {
   const urlMode = searchParams.get('mode') as ReviewMode || 'RECOGNITION';
 
   // Инициализация сессии
-  useEffect(() => {
+    useEffect(() => {
     if (!isAuthenticated) {
-      router.push('/auth');
-      return;
+        router.push('/auth');
+        return;
     }
 
-    // Создаем сессию только если её нет и есть параметры в URL
-    if (!isReviewSession && !currentReviewWord && (searchParams.get('sessionType') || searchParams.get('mode'))) {
-      console.log('🔄 ReviewPage: Создание новой сессии...', {
+    // Создаем сессию только если её нет И нет текущей сессии
+    if (!isReviewSession && !currentSession && (searchParams.get('sessionType') || searchParams.get('mode'))) {
+        console.log('🔄 ReviewPage: Создание новой сессии...', {
         sessionType: urlSessionType,
-        mode: urlMode
-      });
-      
-      createReviewSession(urlMode, urlSessionType).catch((error) => {
+        mode: urlMode,
+        hasCurrentSession: !!currentSession,
+        isReviewSession
+        });
+        
+        createReviewSession(urlMode, urlSessionType).catch((error) => {
         console.error('Ошибка создания сессии:', error);
         toast.error('Не удалось создать сессию повторения');
         router.push('/dashboard');
-      });
+        });
     }
-  }, [isAuthenticated, isReviewSession, currentReviewWord, urlSessionType, urlMode, createReviewSession, router, searchParams]);
+    }, [isAuthenticated, isReviewSession, currentSession, urlSessionType, urlMode, createReviewSession, router, searchParams]);
 
   // Обработка оценки для режима Recognition
   const handleSubmitRating = async (rating: number) => {
@@ -287,8 +289,9 @@ export default function ReviewPage() {
     );
   }
 
-  const totalWords = sessionStats.total + remainingWords + 1;
-  const progress = ((sessionStats.total + 1) / totalWords) * 100;
+    const totalWords = currentSession?.totalWords || 0;
+    const completedWords = totalWords - (remainingWords || 0);
+    const progressPercentage = totalWords > 0 ? Math.round((completedWords / totalWords) * 100) : 0;
   const ModeIcon = getModeIcon();
 
   return (
@@ -331,11 +334,20 @@ export default function ReviewPage() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex justify-between text-sm text-gray-600">
-              <span>{sessionStats.total + 1} из {totalWords}</span>
-              <span>{Math.round(progress)}%</span>
+            {/* <div className="flex justify-between text-sm text-gray-600">
+              <span>{completedWords} из {totalWords}</span>
+              <span>{progressPercentage}%</span>
             </div>
-            <ProgressBar progress={progress} />
+            <ProgressBar progress={progress} /> */}
+            <ProgressBar 
+  showSessionProgress={true}
+  currentSession={currentSession}
+  remainingWords={remainingWords}
+  reviewMode={reviewMode}
+  currentRound={currentRound}
+  color="blue"
+  className="mb-6"
+/>
           </div>
         </div>
       </div>

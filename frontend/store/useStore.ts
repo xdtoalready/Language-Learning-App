@@ -469,26 +469,43 @@ submitReviewInSession: async (data: {
       direction: data.direction || state.currentDirection
     });
     
-    // Обновляем состояние
-    set({
-      currentReviewWord: response.currentWord,
-      hasMoreWords: response.hasMoreWords,
-      remainingWords: response.remainingWords,
-      hintsUsed: 0, // сброс для следующего слова
-      currentRound: response.currentRound || 1,
-      currentDirection: response.currentWord?.direction || state.currentDirection
+    console.log('🔄 Полный ответ от API:', response);
+    
+    // Обрабатываем разные варианты названий полей
+    const nextWord = response.currentWord || response.nextWord || null;
+    const hasMore = response.hasMore ?? response.hasMoreWords ?? false;
+    const remaining = response.remaining ?? response.remainingWords ?? 0;
+    
+    console.log('📊 Обработанные данные:', {
+      nextWord: nextWord?.word || 'null',
+      hasMore,
+      remaining,
+      currentRound: response.currentRound
     });
     
-    console.log('✅ Ревью отправлено, следующее слово:', response.currentWord?.word);
+    // Обновляем состояние
+    set({
+      currentReviewWord: nextWord,
+      hasMoreWords: hasMore,
+      remainingWords: remaining,
+      hintsUsed: 0, // сброс для следующего слова
+      currentRound: response.currentRound || state.currentRound,
+      currentDirection: nextWord?.direction || state.currentDirection
+    });
+    
+    console.log('✅ Ревью отправлено, следующее слово:', nextWord?.word || 'null');
     
     // Если сессия завершена
-    if (!response.hasMoreWords) {
+    if (!hasMore) {
+      console.log('🏁 Сессия завершена');
       set({ 
         isReviewSession: false,
         currentSession: null,
         currentReviewWord: null 
       });
     }
+    
+    return response;
   } catch (error) {
     console.error('❌ Ошибка отправки ревью:', error);
     throw error;
@@ -498,6 +515,34 @@ submitReviewInSession: async (data: {
 getHint: async (wordId: string, hintType: 'length' | 'first_letter') => {
   try {
     const state = get();
+    
+    // Валидация перед отправкой
+    if (!wordId) {
+      console.error('❌ Нет wordId для получения подсказки');
+      throw new Error('Слово не выбрано');
+    }
+    
+    if (!state.currentReviewWord) {
+      console.error('❌ Нет текущего слова для подсказки');
+      throw new Error('Нет активного слова');
+    }
+    
+    // Проверяем, что wordId соответствует текущему слову
+    if (state.currentReviewWord.id !== wordId) {
+      console.error('❌ wordId не соответствует текущему слову', {
+        requested: wordId,
+        current: state.currentReviewWord.id
+      });
+      throw new Error('Неверный ID слова');
+    }
+    
+    console.log('💡 Запрос подсказки:', {
+      wordId,
+      hintType,
+      currentHintsUsed: state.hintsUsed,
+      direction: state.currentDirection,
+      currentWord: state.currentReviewWord.word
+    });
     
     const response = await apiClient.getHint({
       wordId,
@@ -509,7 +554,7 @@ getHint: async (wordId: string, hintType: 'length' | 'first_letter') => {
     // Увеличиваем счетчик подсказок
     set({ hintsUsed: state.hintsUsed + 1 });
     
-    console.log('💡 Подсказка получена:', response.hint);
+    console.log('✅ Подсказка получена:', response.hint);
     return response.hint;
   } catch (error) {
     console.error('❌ Ошибка получения подсказки:', error);

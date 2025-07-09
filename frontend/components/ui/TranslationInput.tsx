@@ -72,21 +72,41 @@ export function TranslationInput({
     setIsSubmitted(false);
   }, [word, expectedAnswer]);
 
-  const handleHint = async (hintType: 'length' | 'first_letter') => {
-    if (disabled || isSubmitted) return;
-
-    try {
-      const hint = await getHint(word, hintType);
-      
-      // Проверяем, что подсказка еще не была получена
-      const existingHint = hints.find(h => h.type === hintType);
-      if (!existingHint) {
-        setHints(prev => [...prev, { ...hint, used: true }]);
-      }
-    } catch (error) {
-      console.error('Ошибка получения подсказки:', error);
+const handleHint = async (type: 'length' | 'first_letter') => {
+  // Добавьте валидацию перед запросом
+  if (!currentReviewWord) {
+    console.error('❌ Нет текущего слова для подсказки');
+    toast.error('Нет активного слова');
+    return;
+  }
+  
+  if (!currentReviewWord.id) {
+    console.error('❌ У текущего слова нет ID');
+    toast.error('Ошибка: неверные данные слова');
+    return;
+  }
+  
+  try {
+    console.log('💡 Запрос подсказки для слова:', {
+      wordId: currentReviewWord.id,
+      word: currentReviewWord.word,
+      type
+    });
+    
+    const hint = await getHint(currentReviewWord.id, type);
+    
+    if (type === 'length') {
+      setLengthHint(hint.content);
+    } else {
+      setFirstLetterHint(hint.content);
     }
-  };
+    
+    toast.success(`Подсказка: ${hint.content}`);
+  } catch (error) {
+    console.error('Ошибка получения подсказки:', error);
+    toast.error('Не удалось получить подсказку');
+  }
+};
 
   const evaluateInput = async (input: string): Promise<InputEvaluation> => {
     // Простая клиентская оценка (в реальном проекте лучше через API)
