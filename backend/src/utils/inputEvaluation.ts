@@ -50,7 +50,7 @@ function normalizeString(str: string): string {
 }
 
 /**
- * Проверяет, является ли строка опечаткой (схожесть > 80%)
+ * Проверяет, является ли строка опечаткой (схожесть > 70%)
  */
 function isTypo(userInput: string, correctAnswer: string): boolean {
   const normalized1 = normalizeString(userInput);
@@ -64,8 +64,18 @@ function isTypo(userInput: string, correctAnswer: string): boolean {
   const maxLength = Math.max(normalized1.length, normalized2.length);
   const similarity = 1 - (distance / maxLength);
   
-  // Считаем опечаткой если схожесть больше 80% и расстояние не более 2 символов
-  return similarity >= 0.8 && distance <= 2;
+  // Считаем опечаткой если схожесть больше 70% и расстояние разумное
+  // Для коротких слов (до 4 букв) - максимум 1 ошибка
+  // Для средних слов (5-8 букв) - максимум 2 ошибки  
+  // Для длинных слов (9+ букв) - максимум 3 ошибки
+  let maxDistance = 1;
+  if (maxLength >= 5 && maxLength <= 8) {
+    maxDistance = 2;
+  } else if (maxLength > 8) {
+    maxDistance = 3;
+  }
+  
+  return similarity >= 0.7 && distance <= maxDistance;
 }
 
 /**
@@ -92,10 +102,15 @@ function calculateSimilarity(userInput: string, correctAnswer: string): number {
 /**
  * Проверяет пробелы согласно требованию:
  * "если в правильном ответе есть пробелы, то они должны быть и в пользовательском вводе"
+ * Учитывает нормализацию множественных пробелов
  */
 function validateSpaces(userInput: string, correctAnswer: string): boolean {
-  const userSpaces = (userInput.match(/\s/g) || []).length;
-  const correctSpaces = (correctAnswer.match(/\s/g) || []).length;
+  // Нормализуем строки для проверки пробелов
+  const normalizedUser = normalizeString(userInput);
+  const normalizedCorrect = normalizeString(correctAnswer);
+  
+  const userSpaces = (normalizedUser.match(/\s/g) || []).length;
+  const correctSpaces = (normalizedCorrect.match(/\s/g) || []).length;
   
   // Если в правильном ответе есть пробелы, они должны быть и в пользовательском вводе
   if (correctSpaces > 0 && userSpaces !== correctSpaces) {
@@ -279,13 +294,18 @@ export function validateInputRealtime(
     warnings.push('Ответ кажется слишком длинным');
   }
   
-  // Проверка пробелов
-  if (!validateSpaces(userInput, correctAnswer)) {
-    if (correctAnswer.includes(' ') && !userInput.includes(' ')) {
-      errors.push('В ответе должны быть пробелы');
-    } else if (!correctAnswer.includes(' ') && userInput.includes(' ')) {
-      errors.push('В ответе не должно быть пробелов');
-    }
+  // Нормализуем для проверки пробелов
+  const normalizedUser = normalizeString(userInput);
+  const normalizedCorrect = normalizeString(correctAnswer);
+  
+  // Проверка пробелов после нормализации
+  const userSpaces = (normalizedUser.match(/\s/g) || []).length;
+  const correctSpaces = (normalizedCorrect.match(/\s/g) || []).length;
+  
+  if (correctSpaces > 0 && userSpaces === 0) {
+    errors.push('В ответе должны быть пробелы');
+  } else if (correctSpaces === 0 && userSpaces > 0) {
+    errors.push('В ответе не должно быть пробелов');
   }
   
   return {
