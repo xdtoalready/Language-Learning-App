@@ -1,44 +1,74 @@
-// lib/api.ts
+// frontend/lib/api.ts - ОБНОВЛЕННЫЙ
 
-import {
-  User,
-  Word,
+import { 
+  User, 
+  Word, 
+  UserStats, 
   WordStats,
-  UserStats,
-  ReviewStats,
-  RegisterRequest,
-  LoginRequest,
-  AuthResponse,
   CreateWordRequest,
   UpdateWordRequest,
+  CreateReviewSessionRequest,
   SubmitReviewRequest,
+  GetHintRequest,
+  GetHintResponse,
   ReviewSessionResponse,
-  WordsResponse,
-  DueWordsResponse,
-  ApiError
+  EvaluateInputResponse,
+  ActiveWordsResponse,
+  ReviewMode,
+  ReviewDirection
 } from '@/types/api';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000';
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
 class ApiClient {
   private baseURL: string;
   private token: string | null = null;
 
-  constructor(baseURL: string) {
+  constructor(baseURL: string = API_BASE_URL) {
     this.baseURL = baseURL;
-    // Загружаем токен из localStorage при инициализации
+    
+    // Инициализируем токен из localStorage при создании
     if (typeof window !== 'undefined') {
       this.token = localStorage.getItem('auth_token');
-      console.log('🔧 API Client инициализирован:', { 
-        baseURL: this.baseURL, 
-        hasToken: !!this.token 
-      });
     }
   }
 
-  // Устанавливает токен авторизации
+  private async request<T>(
+    endpoint: string, 
+    options: RequestInit = {}
+  ): Promise<T> {
+    const url = `${this.baseURL}${endpoint}`;
+    
+    const headers: HeadersInit = {
+      'Content-Type': 'application/json',
+      ...options.headers,
+    };
+
+    if (this.token) {
+      headers.Authorization = `Bearer ${this.token}`;
+    }
+
+    const config: RequestInit = {
+      ...options,
+      headers,
+    };
+
+    try {
+      const response = await fetch(url, config);
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+      }
+
+      return await response.json();
+    } catch (error) {
+      console.error(`API request failed: ${endpoint}`, error);
+      throw error;
+    }
+  }
+
   setToken(token: string | null) {
-    console.log('🔑 Устанавливаем токен:', token ? 'новый токен' : 'очищаем токен');
     this.token = token;
     if (typeof window !== 'undefined') {
       if (token) {
@@ -49,147 +79,45 @@ class ApiClient {
     }
   }
 
-  // Получает токен
-  getToken(): string | null {
-    return this.token;
-  }
-
-  // Базовый метод для выполнения запросов
-private async request<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-    const url = `${this.baseURL}/api${endpoint}`;
-    
-    const headers: HeadersInit = {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    };
-
-  // Добавляем токен авторизации если он есть
-    if (this.token) {
-      headers.Authorization = `Bearer ${this.token}`;
-    }
-
-  try {
-    console.log('🚀 API Request:', { 
-        url, 
-        method: options.method || 'GET', 
-        hasAuth: !!this.token,
-        endpoint 
-      });
-    
-      const response = await fetch(url, {
-        ...options,
-        headers,
-        // Убираем credentials: 'include' если не нужно
-        mode: 'cors'
-      });
-
-      console.log('📡 API Response:', { 
-        status: response.status, 
-        ok: response.ok, 
-        url: response.url,
-        statusText: response.statusText
-      });
-
-    // Проверяем, есть ли содержимое для парсинга
-      const contentType = response.headers.get('content-type');
-      let data: any = null;
-    
-if (contentType && contentType.includes('application/json')) {
-        try {
-          data = await response.json();
-        } catch (jsonError) {
-          console.error('❌ JSON Parse Error:', jsonError);
-          data = { error: 'Invalid JSON response' };
-        }
-      } else {
-        // Если не JSON, получаем как текст
-        const textResponse = await response.text();
-        console.log('📄 Non-JSON Response:', textResponse);
-        data = { error: textResponse || 'No response body' };
-      }
-
-      if (!response.ok) {
-        const errorMessage = data?.error || data?.message || `HTTP error! status: ${response.status}`;
-        console.error('❌ API Error:', { status: response.status, message: errorMessage, data });
-        
-        // Если токен невалиден, очищаем его
-        if (response.status === 401 || response.status === 403) {
-          console.log('🔄 Токен невалиден, очищаем...');
-          this.setToken(null);
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      console.log('✅ API Success:', data);
-      return data;
-    } catch (error) {
-      console.error('🔥 Network/Fetch Error:', error);
-      
-      if (error instanceof Error) {
-        // Если это наша ошибка из ответа сервера
-        if (error.message.includes('HTTP error!') || error.message.includes('error')) {
-          throw error;
-        }
-        // Если это сетевая ошибка
-        throw new Error(`Сетевая ошибка: ${error.message}`);
-      }
-      
-      throw new Error('Неизвестная ошибка сети');
-    }
-  }
-
-  async getFriendProfile(friendId: string): Promise<{ friend: any }> {
-  return this.request<{ friend: any }>(`/friendships/${friendId}/profile`);
-}
-
-  // Методы аутентификации
-  async register(userData: RegisterRequest): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth/register', {
+  // ====================== AUTH ======================
+  
+  async login(emailOrUsername: string, password: string) {
+    const response = await this.request<{ message: string; token: string; user: User }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify(userData),
+      body: JSON.stringify({ emailOrUsername, password }),
     });
     
-    // Сохраняем токен после успешной регистрации
     this.setToken(response.token);
     return response;
   }
 
-  async login(credentials: LoginRequest): Promise<AuthResponse> {
-    const response = await this.request<AuthResponse>('/auth/login', {
+  async register(email: string, username: string, password: string, learningLanguage: string) {
+    const response = await this.request<{ message: string; token: string; user: User }>('/auth/register', {
       method: 'POST',
-      body: JSON.stringify(credentials),
+      body: JSON.stringify({ email, username, password, learningLanguage }),
     });
     
-    // Сохраняем токен после успешного входа
     this.setToken(response.token);
     return response;
   }
 
-  async updateProfile(updates: {
-    username?: string;
-    learningLanguage?: string;
-    dailyGoal?: number;
-    avatar?: string;
-  }): Promise<{ message: string; user: User }> {
-    return this.request<{ message: string; user: User }>('/auth/profile', {
+  async getProfile() {
+    return this.request<{ user: User }>('/auth/profile');
+  }
+
+  async updateProfile(updates: { username?: string; learningLanguage?: string; dailyGoal?: number; avatar?: string; }) {
+    return this.request<{ user: User }>('/auth/profile', {
       method: 'PUT',
       body: JSON.stringify(updates),
     });
-  }
-
-  async getProfile(): Promise<{ user: User }> {
-    return this.request<{ user: User }>('/auth/me');
   }
 
   logout() {
     this.setToken(null);
   }
 
-  // Методы для работы со словами
+  // ====================== WORDS ======================
+
   async getWords(params?: {
     search?: string;
     tags?: string;
@@ -198,209 +126,270 @@ if (contentType && contentType.includes('application/json')) {
     limit?: number;
     sortBy?: string;
     sortOrder?: 'asc' | 'desc';
-  }): Promise<WordsResponse> {
-    const searchParams = new URLSearchParams();
-    
+  }) {
+    const queryParams = new URLSearchParams();
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined) {
-          searchParams.append(key, value.toString());
+          queryParams.append(key, value.toString());
         }
       });
     }
-
-    const query = searchParams.toString() ? `?${searchParams.toString()}` : '';
-    return this.request<WordsResponse>(`/words${query}`);
+    
+    const endpoint = queryParams.toString() ? `/words?${queryParams}` : '/words';
+    return this.request<{ 
+      words: Word[], 
+      pagination: { 
+        currentPage: number, 
+        totalPages: number, 
+        totalCount: number, 
+        limit: number, 
+        hasNext: boolean, 
+        hasPrev: boolean 
+      } 
+    }>(endpoint);
   }
 
-  async getDueWords(): Promise<DueWordsResponse> {
-    return this.request<DueWordsResponse>('/words/due');
-  }
-
-  async getWord(id: string): Promise<{ word: Word }> {
-    return this.request<{ word: Word }>(`/words/${id}`);
-  }
-
-  async createWord(wordData: CreateWordRequest): Promise<{ message: string; word: Word }> {
+  async createWord(data: CreateWordRequest) {
     return this.request<{ message: string; word: Word }>('/words', {
       method: 'POST',
-      body: JSON.stringify(wordData),
+      body: JSON.stringify(data),
     });
   }
 
-  async updateWord(id: string, wordData: UpdateWordRequest): Promise<{ message: string; word: Word }> {
+  async updateWord(id: string, data: UpdateWordRequest) {
     return this.request<{ message: string; word: Word }>(`/words/${id}`, {
       method: 'PUT',
-      body: JSON.stringify(wordData),
+      body: JSON.stringify(data),
     });
   }
 
-  async deleteWord(id: string): Promise<{ message: string }> {
+  async deleteWord(id: string) {
     return this.request<{ message: string }>(`/words/${id}`, {
       method: 'DELETE',
     });
   }
 
-  async getWordsStats(): Promise<{ stats: WordStats }> {
+  async getWordsStats() {
     return this.request<{ stats: WordStats }>('/words/stats');
   }
 
-  // Методы для ревью
-  async startReviewSession(): Promise<ReviewSessionResponse> {
-    return this.request<ReviewSessionResponse>('/reviews/session/start');
+  async getDueWords() {
+    return this.request<{ words: Word[], count: number, date: string }>('/words/due');
   }
 
-  async submitReview(reviewData: SubmitReviewRequest): Promise<{
-    message: string;
-    progressUpdate: {
-      masteryLevel: number;
-      nextReviewDate: string;
-      currentInterval: number;
-      isWordMastered: boolean;
-    };
-  }> {
-    return this.request('/reviews', {
+  // =================== НОВЫЕ REVIEW ENDPOINTS ===================
+
+  /**
+   * Создать новую сессию ревью
+   */
+  async createReviewSession(data: CreateReviewSessionRequest): Promise<ReviewSessionResponse> {
+    return this.request<ReviewSessionResponse>('/reviews/sessions', {
       method: 'POST',
-      body: JSON.stringify(reviewData),
+      body: JSON.stringify(data),
     });
   }
 
-  async getReviewStats(days?: number): Promise<{ stats: ReviewStats }> {
-    const query = days ? `?days=${days}` : '';
-    return this.request<{ stats: ReviewStats }>(`/reviews/stats${query}`);
+  /**
+   * Получить текущее слово в сессии
+   */
+  async getCurrentWord(sessionId: string): Promise<ReviewSessionResponse> {
+    return this.request<ReviewSessionResponse>(`/reviews/sessions/${sessionId}/current`);
   }
 
-  // Методы для статистики
-  async getUserStats(): Promise<UserStats> {
-    return this.request<UserStats>('/stats');
+  /**
+   * Отправить ревью в рамках сессии
+   */
+  async submitReviewInSession(
+    sessionId: string, 
+    data: Omit<SubmitReviewRequest, 'sessionId'>
+  ): Promise<ReviewSessionResponse> {
+    return this.request<ReviewSessionResponse>(`/reviews/sessions/${sessionId}/submit`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
   }
 
-  async updateDailyGoal(dailyGoal: number): Promise<{ message: string; dailyGoal: number }> {
-    return this.request<{ message: string; dailyGoal: number }>('/stats/daily-goal', {
+  /**
+   * Завершить сессию
+   */
+  async endSession(sessionId: string): Promise<{ success: boolean; sessionStats: any; message: string }> {
+    return this.request(`/reviews/sessions/${sessionId}`, {
+      method: 'DELETE',
+    });
+  }
+
+  /**
+   * Получить подсказку для слова
+   */
+  async getHint(data: GetHintRequest): Promise<GetHintResponse> {
+    return this.request<GetHintResponse>('/reviews/hint', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  /**
+   * Получить слова для тренировочного полигона
+   */
+  async getTrainingWords(params?: {
+    tags?: string;
+    masteryLevel?: string;
+    limit?: number;
+  }): Promise<ActiveWordsResponse> {
+    const queryParams = new URLSearchParams();
+    if (params) {
+      Object.entries(params).forEach(([key, value]) => {
+        if (value !== undefined) {
+          queryParams.append(key, value.toString());
+        }
+      });
+    }
+    
+    const endpoint = queryParams.toString() ? `/reviews/training-words?${queryParams}` : '/reviews/training-words';
+    return this.request<ActiveWordsResponse>(endpoint);
+  }
+
+  // ================== LEGACY REVIEW METHODS (для обратной совместимости) ==================
+
+  /**
+   * @deprecated Используйте createReviewSession + getCurrentWord
+   */
+  async startReviewSession() {
+    return this.request<ReviewSessionResponse>('/reviews/start');
+  }
+
+  /**
+   * @deprecated Используйте submitReviewInSession
+   */
+  async submitReview(data: { wordId: string; rating: number }) {
+    return this.request<{ success: boolean }>('/reviews/submit', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  }
+
+  // ====================== STATS ======================
+
+  async getUserStats() {
+    return this.request<{ stats: UserStats }>('/stats');
+  }
+
+  async updateDailyGoal(goal: number) {
+    return this.request<{ user: User }>('/stats/daily-goal', {
       method: 'PUT',
-      body: JSON.stringify({ dailyGoal }),
+      body: JSON.stringify({ dailyGoal: goal }),
     });
   }
 
-  async getDifficultWords(limit?: number): Promise<{ difficultWords: Word[] }> {
-    const query = limit ? `?limit=${limit}` : '';
-    return this.request<{ difficultWords: Word[] }>(`/stats/difficult-words${query}`);
+  // ====================== FRIENDS ======================
+
+  async getFriends() {
+    return this.request<{ friends: any[] }>('/friends');
   }
 
-   // ===== МЕТОДЫ ДЛЯ СЛОВ ДРУЗЕЙ =====
-
-    /**
-     * Получить активные слова друга
-     */
-    async getFriendWords(
-    friendId: string, 
-    params?: {
-        search?: string;
-        tags?: string;
-        page?: number;
-        limit?: number;
-    }
-    ): Promise<FriendWordsResponse> {
-        const queryParams = new URLSearchParams();
-        
-        if (params?.search) queryParams.append('search', params.search);
-        if (params?.tags) queryParams.append('tags', params.tags);
-        if (params?.page) queryParams.append('page', params.page.toString());
-        if (params?.limit) queryParams.append('limit', params.limit.toString());
-
-        const query = queryParams.toString();
-        const endpoint = `/friendships/${friendId}/words${query ? `?${query}` : ''}`;
-        
-        console.log('🔍 Загружаем слова друга:', { friendId, params });
-        return this.request<FriendWordsResponse>(endpoint);
-    }
-
-    /**
-     * Копировать слово друга к себе в словарь
-     */
-    async copyFriendWord(friendId: string, wordId: string): Promise<CopyWordResponse> {
-        console.log('📋 Копируем слово друга:', { friendId, wordId });
-        return this.request<CopyWordResponse>(`/friendships/${friendId}/words/${wordId}/copy`, {
-            method: 'POST'
-        });
-    }
-
-  // ============== МЕТОДЫ ДРУЗЕЙ ==============
-  
-  async searchUsers(query: string): Promise<{ users: any[] }> {
-    return this.request<{ users: any[] }>(`/friendships/search?query=${encodeURIComponent(query)}`);
+  async getFriendsWithClouds() {
+    return this.request<{ friends: any[] }>('/friends/clouds');
   }
 
-  async sendFriendRequest(friendId: string): Promise<{ message: string; friendship: any }> {
-    return this.request<{ message: string; friendship: any }>('/friendships/request', {
+  async searchUsers(query: string) {
+    return this.request<{ users: any[] }>(`/friends/search?q=${encodeURIComponent(query)}`);
+  }
+
+  async sendFriendRequest(friendId: string) {
+    return this.request<{ message: string }>('/friends/request', {
       method: 'POST',
       body: JSON.stringify({ friendId }),
     });
   }
 
-  async respondToFriendRequest(friendshipId: string, action: 'accept' | 'reject'): Promise<{ message: string; friendship?: any }> {
-    return this.request<{ message: string; friendship?: any }>(`/friendships/request/${friendshipId}`, {
-      method: 'PUT',
+  async getPendingRequests() {
+    return this.request<{ requests: any[] }>('/friends/pending');
+  }
+
+  async respondToFriendRequest(friendshipId: string, action: 'accept' | 'reject') {
+    return this.request<{ message: string }>(`/friends/respond/${friendshipId}`, {
+      method: 'POST',
       body: JSON.stringify({ action }),
     });
   }
 
-  async getFriends(): Promise<{ friends: any[] }> {
-    return this.request<{ friends: any[] }>('/friendships');
-  }
-
-  async getFriendsWithClouds(): Promise<{ friends: any[] }> {
-    return this.request<{ friends: any[] }>('/friendships/clouds');
-  }
-
-  async getPendingRequests(): Promise<{ requests: any[] }> {
-    return this.request<{ requests: any[] }>('/friendships/requests');
-  }
-
-  async removeFriend(friendshipId: string): Promise<{ message: string }> {
-    return this.request<{ message: string }>(`/friendships/${friendshipId}`, {
+  async removeFriend(friendshipId: string) {
+    return this.request<{ message: string }>(`/friends/${friendshipId}`, {
       method: 'DELETE',
     });
   }
 
-  // Проверка здоровья API
-  async healthCheck(): Promise<{ status: string; timestamp: string; service: string }> {
-    return this.request<{ status: string; timestamp: string; service: string }>('/health');
+  // =================== UTILITY METHODS ===================
+
+  /**
+   * Проверить доступность API
+   */
+  async healthCheck() {
+    return this.request<{ status: string; timestamp: string }>('/health');
+  }
+
+  /**
+   * Оценить пользовательский ввод (клиентская функция для предварительной проверки)
+   */
+  evaluateInputLocally(
+    userInput: string, 
+    correctAnswer: string, 
+    synonyms: string[] = []
+  ): { isValid: boolean; suggestions: string[] } {
+    const normalizedInput = userInput.trim().toLowerCase();
+    const normalizedCorrect = correctAnswer.trim().toLowerCase();
+    
+    // Простая клиентская проверка
+    if (normalizedInput === normalizedCorrect) {
+      return { isValid: true, suggestions: [] };
+    }
+    
+    // Проверяем синонимы
+    const matchesSynonym = synonyms.some(synonym => 
+      synonym.trim().toLowerCase() === normalizedInput
+    );
+    
+    if (matchesSynonym) {
+      return { isValid: true, suggestions: [] };
+    }
+    
+    return { 
+      isValid: false, 
+      suggestions: [correctAnswer, ...synonyms].slice(0, 3) 
+    };
+  }
+
+  /**
+   * Создать быструю ежедневную сессию
+   */
+  async createDailySession(mode: ReviewMode = 'RECOGNITION'): Promise<ReviewSessionResponse> {
+    return this.createReviewSession({
+      mode,
+      sessionType: 'daily'
+    });
+  }
+
+  /**
+   * Создать тренировочную сессию
+   */
+  async createTrainingSession(
+    mode: ReviewMode = 'RECOGNITION',
+    filters?: {
+      tags?: string[];
+      masteryLevel?: number[];
+      onlyActive?: boolean;
+    }
+  ): Promise<ReviewSessionResponse> {
+    return this.createReviewSession({
+      mode,
+      sessionType: 'training',
+      filterBy: filters
+    });
   }
 }
 
-export interface FriendWordsResponse {
-  words: Array<{
-    id: string;
-    word: string;
-    translation: string;
-    transcription?: string;
-    tags: string[];
-    masteryLevel: number;
-    createdAt: string;
-  }>;
-  availableTags: string[];
-  pagination: {
-    currentPage: number;
-    totalPages: number;
-    totalCount: number;
-    limit: number;
-    hasNext: boolean;
-    hasPrev: boolean;
-  };
-}
+// Создаем и экспортируем экземпляр
+const apiClient = new ApiClient();
 
-export interface CopyWordResponse {
-  message: string;
-  word: Word;
-  copiedFrom: {
-    username: string;
-    originalWord: string;
-  };
-}
-
-// Создаем единственный экземпляр API клиента
-export const apiClient = new ApiClient(API_BASE_URL);
-
-// Экспортируем для удобства
 export default apiClient;
