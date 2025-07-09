@@ -63,7 +63,7 @@ class ApiTester {
 
     // Тест логина
     const loginResult = await this.request('/auth/login', 'POST', {
-      emailOrUsername: 'test@example.com',
+      emailOrUsername: 'test1@example.com',
       password: '123456'
     }, false);
 
