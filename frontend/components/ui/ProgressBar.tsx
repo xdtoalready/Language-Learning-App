@@ -51,7 +51,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
       : 0;
 
     return (
-      <div className={cn('w-full', className)}>
+      <div className={cn('w-full')}>
         {/* Информация о раунде для TRANSLATION_INPUT */}
         {reviewMode === 'TRANSLATION_INPUT' && totalWords > 0 && (
           <div className="text-center text-sm text-gray-500 mb-2">
@@ -96,7 +96,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
     );
   }
 
-  // ✅ Стандартный режим (как было раньше) с улучшенной защитой
+  // Стандартный режим
   const percentage = Math.min(100, Math.max(0, max > 0 ? (value / max) * 100 : 0));
 
   return (

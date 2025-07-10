@@ -543,14 +543,14 @@ const getProgress = () => {
 
         {/* Прогресс */}
         <div className="mb-8">
-            <div className="flex justify-between items-center mb-2">
+            {/* <div className="flex justify-between items-center mb-2">
                 <span className="text-sm font-medium text-gray-700">
                 Прогресс
                 </span>
                 <span className="text-sm text-gray-500">
                 {sessionStats.total} из {sessionStats.totalWords} слов
                 </span>
-            </div>
+            </div> */}
             <ProgressBar 
                 value={getProgress()}
                 max={100}
