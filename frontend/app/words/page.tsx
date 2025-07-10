@@ -240,13 +240,14 @@ export default function WordsPage() {
                 <div className="flex-1">
                   <div className="relative">
                     <MagnifyingGlassIcon className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                    <Input
-                      type="text"
-                      placeholder="Поиск по словам, переводам или тегам..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-10"
-                    />
+                        <Input
+                        type="text"
+                        placeholder="Поиск по словам, переводам или тегам..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="pl-10"
+                        wrapperClassName="space-y-1"
+                        />
                   </div>
                 </div>
 

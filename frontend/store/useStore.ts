@@ -419,7 +419,7 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
   try {
     console.log('🔄 Создание сессии ревью:', { mode, sessionType, filters });
     
-    // Полная очистка состояния перед созданием новой сессии
+    // ✅ ИСПРАВЛЕНИЕ: ПОЛНАЯ очистка состояния перед созданием новой сессии
     set({
       isReviewSession: false,
       currentSession: null,
@@ -431,8 +431,19 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
       reviewMode: undefined,
       currentDirection: 'LEARNING_TO_NATIVE',
       sessionType: undefined,
-      isSessionCompleted: false
+      isSessionCompleted: false,
+      // ✅ НОВОЕ: Добавляем очистку дополнительных полей
+      currentWord: null,
+      // Добавляем небольшую задержку для полной очистки состояния
+      ...Object.keys(get()).reduce((acc, key) => {
+        if (key.includes('session') || key.includes('review') || key.includes('current')) {
+          acc[key] = null;
+        }
+        return acc;
+      }, {} as any)
     });
+    
+    console.log('🧹 Состояние полностью очищено перед созданием новой сессии');
     
     const response = await apiClient.createReviewSession({
       mode,
@@ -481,7 +492,7 @@ createReviewSession: async (mode: ReviewMode, sessionType: 'daily' | 'training',
       currentReviewWord: response.currentWord,
       hasMoreWords: response.hasMoreWords ?? response.hasMore ?? false,
       remainingWords: response.remainingWords ?? response.remaining ?? 0,
-      // НЕ устанавливаем isSessionCompleted в true при создании
+      // ✅ ИСПРАВЛЕНИЕ: НЕ устанавливаем isSessionCompleted в true при создании
       isSessionCompleted: false
     };
     
@@ -696,7 +707,7 @@ endSessionNew: async () => {
     
     const response = await apiClient.endSession(state.currentSession.sessionId);
     
-    // ПОЛНАЯ очистка состояния
+    // ✅ ИСПРАВЛЕНИЕ: ПОЛНАЯ очистка состояния с дополнительными полями
     set({
       isReviewSession: false,
       currentSession: null,
@@ -709,8 +720,21 @@ endSessionNew: async () => {
       currentDirection: 'LEARNING_TO_NATIVE',
       sessionType: undefined,
       isSessionCompleted: false, // Сбрасываем флаг завершения
-      // Добавляем сброс всех связанных полей
-      currentWord: null
+      // ✅ НОВОЕ: Добавляем сброс всех связанных полей
+      currentWord: null,
+      // Дополнительная очистка всех возможных остатков состояния
+      ...Object.keys(state).reduce((acc, key) => {
+        if (key.includes('session') || key.includes('review') || key.includes('current')) {
+          if (typeof state[key] === 'boolean') {
+            acc[key] = false;
+          } else if (typeof state[key] === 'number') {
+            acc[key] = 0;
+          } else {
+            acc[key] = null;
+          }
+        }
+        return acc;
+      }, {} as any)
     });
     
     console.log('✅ Сессия завершена вручную, состояние ПОЛНОСТЬЮ очищено:', response?.sessionStats);
@@ -718,6 +742,7 @@ endSessionNew: async () => {
   } catch (error) {
     console.error('❌ Ошибка завершения сессии:', error);
     
+    // ✅ Даже при ошибке полностью очищаем состояние
     set({
       isReviewSession: false,
       currentSession: null,
@@ -735,6 +760,39 @@ endSessionNew: async () => {
     
     throw error;
   }
+},
+
+clearSessionState: () => {
+  console.log('🧹 Принудительная очистка состояния сессии');
+  const state = get();
+  
+  set({
+    isReviewSession: false,
+    currentSession: null,
+    currentReviewWord: null,
+    hasMoreWords: false,
+    remainingWords: 0,
+    hintsUsed: 0,
+    currentRound: 1,
+    reviewMode: undefined,
+    currentDirection: 'LEARNING_TO_NATIVE',
+    sessionType: undefined,
+    isSessionCompleted: false,
+    currentWord: null,
+    // Очищаем все поля, связанные с сессиями
+    ...Object.keys(state).reduce((acc, key) => {
+      if (key.includes('session') || key.includes('review') || key.includes('current')) {
+        if (typeof state[key] === 'boolean') {
+          acc[key] = false;
+        } else if (typeof state[key] === 'number') {
+          acc[key] = 0;
+        } else {
+          acc[key] = null;
+        }
+      }
+      return acc;
+    }, {} as any)
+  });
 },
 
   // Review actions

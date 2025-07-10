@@ -63,85 +63,164 @@ export default function ReviewPage() {
   // 🔒 Защита от двойного вызова
   const sessionCreatedRef = useRef(false);
   const isCreatingSession = useRef(false);
+  const [forceShowResults, setForceShowResults] = useState(false);
   
   // Читаем параметры из URL
   const urlSessionType = searchParams.get('sessionType') as 'daily' | 'training' || 'daily';
   const urlMode = searchParams.get('mode') as ReviewMode || 'RECOGNITION';
 
-  // инициализация сессии
-useEffect(() => {
-  if (!isAuthenticated) {
-    router.push('/auth');
-    return;
-  }
+  // ✅ ИСПРАВЛЕНИЕ: Сброс флагов при изменении URL параметров
+  useEffect(() => {
+    console.log('🔄 URL параметры изменились, сброс флагов и состояния');
+    sessionCreatedRef.current = false;
+    isCreatingSession.current = false;
+    setForceShowResults(false);
+    setShowTranslation(false);
+  }, [urlSessionType, urlMode]);
 
-  // Защита от повторного создания сессии
-  if (sessionCreatedRef.current || isCreatingSession.current) {
-    console.log('🛡️ Защита: сессия уже создается или создана');
-    return;
-  }
-
-  // Создаем сессию только если её действительно нет
-  const shouldCreateSession = !currentSession && 
-                              !isReviewSession && 
-                              (searchParams.get('sessionType') || searchParams.get('mode'));
-
-  if (shouldCreateSession) {
-    console.log('🔄 ReviewPage: Создание новой сессии...', {
-      sessionType: urlSessionType,
-      mode: urlMode,
-      hasCurrentSession: !!currentSession,
-      isReviewSession
-    });
-    
-    isCreatingSession.current = true;
-    sessionCreatedRef.current = true;
-    
-    createReviewSession(urlMode, urlSessionType)
-      .then((response) => {
-        console.log('✅ Сессия успешно создана');
-        
-        // Правильная инициализация статистики
-        if (response?.session && response.session.sessionId) {
-          // Для полноценной сессии
-          const totalWords = response.session.totalWords || 
-                           (response.remainingWords + (response.currentWord ? 1 : 0));
-          setSessionStats(prev => ({
-            ...prev,
-            totalWords,
-            total: 0,
-            correct: 0
-          }));
-          console.log('📊 Инициализация статистики для полной сессии:', { totalWords });
-        } else {
-          // Для пустой сессии (нет слов для повторения)
-          setSessionStats(prev => ({
-            ...prev,
-            totalWords: 0,
-            total: 0,
-            correct: 0
-          }));
-          console.log('📊 Инициализация статистики для пустой сессии');
-        }
-      })
-      .catch((error) => {
-        console.error('❌ Ошибка создания сессии:', error);
-        toast.error('Не удалось создать сессию повторения');
-        router.push('/dashboard');
-      })
-      .finally(() => {
-        isCreatingSession.current = false;
+  // ✅ ИСПРАВЛЕНИЕ: Улучшенная логика сброса флагов
+  useEffect(() => {
+    // Сбрасываем флаги в любом из случаев:
+    // 1. Нет активной сессии И нет состояния ревью
+    // 2. Показаны результаты (завершение сессии)
+    if ((!currentSession && !isReviewSession) || isSessionCompleted) {
+      console.log('🧹 Очистка флагов сессии:', {
+        hasSession: !!currentSession,
+        isReviewSession,
+        isSessionCompleted
       });
-  }
-}, [isAuthenticated, currentSession, isReviewSession]);
-
-  // Сброс флагов при смене сессии
-useEffect(() => {
-    if (!currentSession && !isReviewSession) {
       sessionCreatedRef.current = false;
       isCreatingSession.current = false;
+      
+      // ✅ НОВОЕ: Сбрасываем forceShowResults при очистке
+      if (isSessionCompleted && !currentSession) {
+        setForceShowResults(false);
+      }
     }
-  }, [currentSession, isReviewSession]);
+  }, [currentSession, isReviewSession, isSessionCompleted]);
+
+  // инициализация сессии
+  useEffect(() => {
+    if (!isAuthenticated) {
+      router.push('/auth');
+      return;
+    }
+
+    // ✅ ИСПРАВЛЕНИЕ: Улучшенная защита с логированием
+    if (sessionCreatedRef.current || isCreatingSession.current) {
+      console.log('🛡️ Защита: сессия уже создается или создана', {
+        sessionCreated: sessionCreatedRef.current,
+        isCreating: isCreatingSession.current
+      });
+      return;
+    }
+
+    // Создаем сессию только если её действительно нет
+    const shouldCreateSession = !currentSession && 
+                                !isReviewSession && 
+                                !isSessionCompleted &&
+                                (searchParams.get('sessionType') || searchParams.get('mode'));
+
+    if (shouldCreateSession) {
+      console.log('🔄 ReviewPage: Создание новой сессии...', {
+        sessionType: urlSessionType,
+        mode: urlMode,
+        hasCurrentSession: !!currentSession,
+        isReviewSession,
+        isSessionCompleted
+      });
+      
+      // ✅ ИСПРАВЛЕНИЕ: Дополнительная очистка перед созданием
+      setForceShowResults(false);
+      setSessionStats({ total: 0, correct: 0, totalWords: 0, ratings: { 1: 0, 2: 0, 3: 0, 4: 0 } });
+      
+      isCreatingSession.current = true;
+      sessionCreatedRef.current = true;
+      
+      createReviewSession(urlMode, urlSessionType)
+        .then((response) => {
+          console.log('✅ Сессия успешно создана');
+          
+          // Правильная инициализация статистики
+          if (response?.session && response.session.sessionId) {
+            // Для полноценной сессии
+            const totalWords = response.session.totalWords || 
+                             (response.remainingWords + (response.currentWord ? 1 : 0));
+            setSessionStats(prev => ({
+              ...prev,
+              totalWords,
+              total: 0,
+              correct: 0
+            }));
+            console.log('📊 Инициализация статистики для полной сессии:', { totalWords });
+          } else {
+            // Для пустой сессии (нет слов для повторения)
+            setSessionStats(prev => ({
+              ...prev,
+              totalWords: 0,
+              total: 0,
+              correct: 0
+            }));
+            console.log('📊 Инициализация статистики для пустой сессии');
+          }
+        })
+        .catch((error) => {
+          console.error('❌ Ошибка создания сессии:', error);
+          toast.error('Не удалось создать сессию повторения');
+          router.push('/dashboard');
+        })
+        .finally(() => {
+          isCreatingSession.current = false;
+        });
+    }
+  }, [isAuthenticated, currentSession, isReviewSession, isSessionCompleted, searchParams]);
+
+  useEffect(() => {
+    console.log('🔍 Состояние компонента изменилось:', {
+      isSessionCompleted,
+      hasMoreWords,
+      currentReviewWord: !!currentReviewWord,
+      sessionStats,
+      forceShowResults,
+      isCompleted: isCompleted
+    });
+  }, [isSessionCompleted, hasMoreWords, currentReviewWord, sessionStats, forceShowResults]);
+
+  // проверка состояния загрузки
+  const isLoading = isCreatingSession.current || 
+                   (sessionCreatedRef.current && !currentSession && !isSessionCompleted) ||
+                   (!currentReviewWord && hasMoreWords && !isSessionCompleted);
+
+  // Проверка завершения с улучшенной логикой
+  const isCompleted = isSessionCompleted || 
+                     forceShowResults ||
+                     (sessionStats.totalWords > 0 && sessionStats.total >= sessionStats.totalWords) ||
+                     (!hasMoreWords && !currentReviewWord && sessionStats.total > 0);
+
+  console.log('🔍 Детальная проверка состояния:', {
+    isSessionCompleted,
+    hasMoreWords,
+    isReviewSession,
+    isLoading,
+    sessionCreated: sessionCreatedRef.current,
+    sessionStats,
+    currentReviewWord: !!currentReviewWord,
+    currentSession: !!currentSession,
+    isCompleted,
+    creating: isCreatingSession.current
+  });
+
+  // ✅ ИСПРАВЛЕНИЕ: Экстренная активация результатов с отложенным таймером
+  useEffect(() => {
+    if (sessionStats.totalWords > 0 && sessionStats.total >= sessionStats.totalWords && !isCompleted) {
+      console.log('🚨 Экстренная активация результатов по таймеру');
+      const timer = setTimeout(() => {
+        setForceShowResults(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [sessionStats.total, sessionStats.totalWords, isCompleted]);
 
   const validateSession = () => {
     if (!currentSession) {
@@ -168,64 +247,80 @@ useEffect(() => {
   };
 
   // Обработка оценки для режима Recognition
-const handleSubmitRating = async (rating: number) => {
-  if (!currentReviewWord || !currentSession) return;
+  const handleSubmitRating = async (rating: number) => {
+    if (!currentReviewWord || !currentSession) return;
 
-  try {
-    // Обновляем статистику ПЕРЕД отправкой
-    setSessionStats(prev => ({
-      ...prev,
-      total: prev.total + 1,
-      correct: prev.correct + (rating >= 3 ? 1 : 0),
-      ratings: {
-        ...prev.ratings,
-        [rating]: prev.ratings[rating as keyof typeof prev.ratings] + 1
+    try {
+      // Обновляем статистику ПЕРЕД отправкой
+      setSessionStats(prev => ({
+        ...prev,
+        total: prev.total + 1,
+        correct: prev.correct + (rating >= 3 ? 1 : 0),
+        ratings: {
+          ...prev.ratings,
+          [rating]: prev.ratings[rating as keyof typeof prev.ratings] + 1
+        }
+      }));
+
+      const response = await submitReviewInSession({
+        wordId: currentReviewWord.id,
+        rating,
+        reviewMode: 'RECOGNITION',
+        direction: currentDirection,
+        timeSpent: 0
+      });
+
+      // ✅ Проверяем завершение и принудительно активируем результаты
+      if (response?.completed || !response?.hasMoreWords || !response?.currentWord) {
+        console.log('🏁 Recognition сессия завершена');
+        setForceShowResults(true);
       }
-    }));
 
-    const response = await submitReviewInSession({
-      wordId: currentReviewWord.id,
-      rating,
-      reviewMode: 'RECOGNITION',
-      direction: currentDirection,
-      timeSpent: 0
-    });
-
-    // ✅ Проверяем завершение и принудительно активируем результаты
-    if (response?.completed || !response?.hasMoreWords || !response?.currentWord) {
-      console.log('🏁 Recognition сессия завершена');
-      setForceShowResults(true);
+      setShowTranslation(false);
+      
+    } catch (error) {
+      console.error('❌ Ошибка отправки оценки:', error);
+      toast.error('Ошибка при сохранении результата');
     }
-
-    setShowTranslation(false);
-    
-  } catch (error) {
-    console.error('❌ Ошибка отправки оценки:', error);
-    toast.error('Ошибка при сохранении результата');
-  }
-};
+  };
 
   // обработка ввода для режимов Translation/Reverse
-const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
-  if (!validateSession()) return;
+  const handleTranslationSubmit = async (userInput: string, hintsUsed: number, timeSpent: number) => {
+    if (!validateSession()) return;
 
-  try {
-    const response = await submitReviewInSession({
-      wordId: currentReviewWord!.id,
-      userInput,
-      hintsUsed,
-      timeSpent,
-      reviewMode,
-      direction: currentDirection
-    });
+    try {
+      const response = await submitReviewInSession({
+        wordId: currentReviewWord!.id,
+        userInput,
+        hintsUsed,
+        timeSpent,
+        reviewMode,
+        direction: currentDirection
+      });
 
-    console.log('✅ Ответ получен:', response);
+      console.log('✅ Ответ получен:', response);
 
-    // ✅ ПРИНУДИТЕЛЬНАЯ активация результатов
-    if (response.completed || !response.hasMoreWords || !response.currentWord) {
-      console.log('🏁 Сессия завершена, активируем результаты');
-      
-      // Обновляем статистику
+      // ✅ ПРИНУДИТЕЛЬНАЯ активация результатов
+      if (response.completed || !response.hasMoreWords || !response.currentWord) {
+        console.log('🏁 Сессия завершена, активируем результаты');
+        
+        // Обновляем статистику
+        setSessionStats(prev => ({
+          ...prev,
+          total: prev.total + 1,
+          correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
+          ratings: {
+            ...prev.ratings,
+            [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
+          }
+        }));
+        
+        // ✅ ПРИНУДИТЕЛЬНО показываем результаты
+        setForceShowResults(true);
+        return;
+      }
+
+      // Обычное обновление статистики
       setSessionStats(prev => ({
         ...prev,
         total: prev.total + 1,
@@ -235,28 +330,12 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
           [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
         }
       }));
-      
-      // ✅ ПРИНУДИТЕЛЬНО показываем результаты
-      setForceShowResults(true);
-      return;
+
+    } catch (error) {
+      console.error('❌ Ошибка отправки перевода:', error);
+      toast.error('Ошибка при сохранении результата');
     }
-
-    // Обычное обновление статистики
-    setSessionStats(prev => ({
-      ...prev,
-      total: prev.total + 1,
-      correct: prev.correct + (response.evaluation?.score >= 3 ? 1 : 0),
-      ratings: {
-        ...prev.ratings,
-        [response.evaluation?.score || 3]: prev.ratings[response.evaluation?.score as keyof typeof prev.ratings] + 1
-      }
-    }));
-
-  } catch (error) {
-    console.error('❌ Ошибка отправки перевода:', error);
-    toast.error('Ошибка при сохранении результата');
-  }
-};
+  };
 
   // Завершение сессии
   const handleEndSession = async () => {
@@ -264,6 +343,10 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
       if (currentSession) {
         await endSessionNew();
       }
+      // ✅ ИСПРАВЛЕНИЕ: Очищаем локальные флаги при ручном завершении
+      sessionCreatedRef.current = false;
+      isCreatingSession.current = false;
+      setForceShowResults(false);
     } catch (error) {
       console.error('Ошибка завершения сессии:', error);
     } finally {
@@ -299,70 +382,22 @@ const handleTranslationSubmit = async (userInput: string, hintsUsed: number, tim
     }
   };
 
-  const [forceShowResults, setForceShowResults] = useState(false);
-
-  useEffect(() => {
-  console.log('🔍 Состояние компонента изменилось:', {
-    isSessionCompleted,
-    hasMoreWords,
-    currentReviewWord: !!currentReviewWord,
-    sessionStats,
-    forceShowResults,
-    isCompleted: isCompleted
-  });
-}, [isSessionCompleted, hasMoreWords, currentReviewWord, sessionStats, forceShowResults]);
-
-  // проверка состояния загрузки
-  const isLoading = isCreatingSession.current || 
-                   (sessionCreatedRef.current && !currentSession && !isSessionCompleted) ||
-                   (!currentReviewWord && hasMoreWords && !isSessionCompleted);
-
-  // Проверка завершения с улучшенной логикой
-const isCompleted = isSessionCompleted || 
-                   forceShowResults ||
-                   (sessionStats.totalWords > 0 && sessionStats.total >= sessionStats.totalWords) ||
-                   (!hasMoreWords && !currentReviewWord && sessionStats.total > 0);
-
-                      console.log('🔍 Детальная проверка состояния:', {
-    isSessionCompleted,
-    hasMoreWords,
-    isReviewSession,
-    isLoading,
-    sessionCreated: sessionCreatedRef.current,
-    sessionStats,
-    currentReviewWord: !!currentReviewWord,
-    currentSession: !!currentSession,
-    isCompleted,
-    creating: isCreatingSession.current
-  });
-
-useEffect(() => {
-  if (sessionStats.totalWords > 0 && sessionStats.total >= sessionStats.totalWords && !isCompleted) {
-    console.log('🚨 Экстренная активация результатов по таймеру');
-    const timer = setTimeout(() => {
-      setForceShowResults(true);
-    }, 1000);
+  const getProgress = () => {
+    if (sessionStats.totalWords === 0) return 0;
     
-    return () => clearTimeout(timer);
-  }
-}, [sessionStats.total, sessionStats.totalWords, isCompleted]);
-
-const getProgress = () => {
-  if (sessionStats.totalWords === 0) return 0;
-  
-  // Используем правильную формулу для прогресса
-  const currentProgress = (sessionStats.total / sessionStats.totalWords) * 100;
-  const clampedProgress = Math.min(Math.max(currentProgress, 0), 100);
-  
-  console.log('📊 Прогресс:', {
-    total: sessionStats.total,
-    totalWords: sessionStats.totalWords,
-    progress: clampedProgress,
-    remainingWords
-  });
-  
-  return clampedProgress;
-};
+    // Используем правильную формулу для прогресса
+    const currentProgress = (sessionStats.total / sessionStats.totalWords) * 100;
+    const clampedProgress = Math.min(Math.max(currentProgress, 0), 100);
+    
+    console.log('📊 Прогресс:', {
+      total: sessionStats.total,
+      totalWords: sessionStats.totalWords,
+      progress: clampedProgress,
+      remainingWords
+    });
+    
+    return clampedProgress;
+  };
 
   // Если не аутентифицирован, показываем загрузку
   if (!isAuthenticated) {
@@ -439,66 +474,33 @@ const getProgress = () => {
                     <div className="text-sm text-gray-600">
                       {reviewMode === 'RECOGNITION' ? 'Узнавание' :
                        reviewMode === 'TRANSLATION_INPUT' ? 'Ввод перевода' :
-                       reviewMode === 'REVERSE_INPUT' ? 'Обратный ввод' : 'Тренировка'}
+                       reviewMode === 'REVERSE_INPUT' ? 'Обратный ввод' : 'Режим'}
                     </div>
                   </div>
                 </div>
+                
+                {sessionStats.total > 0 && (
+                  <div className="mt-6 space-y-2">
+                    <h3 className="text-sm font-medium text-gray-700">Распределение оценок:</h3>
+                    <div className="grid grid-cols-4 gap-2 text-xs">
+                      {RATING_OPTIONS.map((option) => (
+                        <div key={option.value} className="text-center">
+                          <div className="text-lg">{option.emoji}</div>
+                          <div className="font-medium">{sessionStats.ratings[option.value as keyof typeof sessionStats.ratings]}</div>
+                          <div className="text-gray-500">{option.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
 
-            {/* Детальная статистика по оценкам (только если есть данные) */}
-            {sessionStats.total > 0 && (
-              <Card>
-                <CardContent className="p-6">
-                  <h3 className="text-lg font-semibold mb-4">Детальная статистика</h3>
-                  <div className="grid grid-cols-4 gap-4">
-                    {RATING_OPTIONS.map((option) => (
-                      <div key={option.value} className="text-center">
-                        <div className="text-xl mb-1">{option.emoji}</div>
-                        <div className="text-lg font-bold">
-                          {sessionStats.ratings[option.value as keyof typeof sessionStats.ratings]}
-                        </div>
-                        <div className="text-xs text-gray-600">{option.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Кнопки действий */}
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button
-                onClick={() => router.push('/dashboard')}
-                variant="primary"
-                className="flex items-center gap-2"
-              >
+            <div className="flex flex-col sm:flex-row gap-3 justify-center">
+              <Button onClick={handleEndSession} className="flex items-center gap-2">
                 <HomeIcon className="h-4 w-4" />
-                На главную
+                Завершить
               </Button>
-              
-              {sessionType === 'training' && (
-                <Button
-                  onClick={() => window.location.reload()}
-                  variant="secondary"
-                  className="flex items-center gap-2"
-                >
-                  <ArrowsRightLeftIcon className="h-4 w-4" />
-                  Еще раз
-                </Button>
-              )}
-            </div>
-
-            {/* Информация о типе сессии */}
-            <div className="text-center">
-              <Badge variant={sessionType === 'daily' ? 'primary' : 'secondary'}>
-                {sessionType === 'daily' ? 'Ежедневная тренировка' : 'Тренировочный полигон'}
-              </Badge>
-              {sessionType === 'training' && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Результаты тренировочного полигона не влияют на алгоритм повторений
-                </p>
-              )}
             </div>
           </motion.div>
         </div>
@@ -507,154 +509,150 @@ const getProgress = () => {
   }
 
   // Основной интерфейс тренировки
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Заголовок с навигацией */}
-        <div className="flex items-center justify-between mb-6">
-          <Button
-            variant="ghost"
-            onClick={() => router.push('/dashboard')}
-            className="flex items-center space-x-2"
-          >
-            <ArrowLeftIcon className="h-4 w-4" />
-            <span>Назад</span>
-          </Button>
+  if (!currentReviewWord) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto"></div>
+          <p className="mt-2 text-gray-600">Загрузка слова...</p>
+        </div>
+      </div>
+    );
+  }
 
-          <div className="flex items-center space-x-3">
-            <Badge variant={sessionType === 'daily' ? 'default' : 'secondary'}>
-              {sessionType === 'daily' ? 'Ежедневная' : 'Тренировка'}
-            </Badge>
-            {currentRound && currentRound > 1 && (
-              <Badge variant="outline">
-                Раунд {currentRound}
+  const ModeIcon = getModeIcon();
+  const wordToShow = getWordToShow();
+  const expectedAnswer = getExpectedAnswer();
+
+  return (
+    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white">
+      <div className="max-w-2xl mx-auto px-4 py-8">
+        {/* Заголовок */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-4">
+            <Button
+              variant="ghost"
+              onClick={() => router.back()}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeftIcon className="h-4 w-4" />
+              Назад
+            </Button>
+            
+            <div className="flex items-center gap-2">
+              <Badge variant="secondary" className="flex items-center gap-1">
+                <ModeIcon className="h-3 w-3" />
+                {reviewMode === 'RECOGNITION' ? 'Узнавание' :
+                 reviewMode === 'TRANSLATION_INPUT' ? 'Ввод перевода' :
+                 reviewMode === 'REVERSE_INPUT' ? 'Обратный ввод' : 'Режим'}
               </Badge>
-            )}
+              
+              <Badge variant={sessionType === 'daily' ? 'default' : 'secondary'}>
+                {sessionType === 'daily' ? 'Ежедневная' : 'Тренировка'}
+              </Badge>
+              
+              {reviewMode === 'TRANSLATION_INPUT' && (
+                <Badge variant="outline">
+                  Раунд {currentRound}/2
+                </Badge>
+              )}
+            </div>
           </div>
 
-          <Button
-            variant="ghost"
-            onClick={handleEndSession}
-            className="text-red-600 hover:text-red-700"
-          >
-            Завершить
-          </Button>
+          <ProgressBar 
+            progress={getProgress()} 
+            className="mb-2"
+          />
+          <p className="text-sm text-gray-600 text-center">
+            {sessionStats.total} из {sessionStats.totalWords} • Осталось: {remainingWords}
+          </p>
         </div>
 
-        {/* Прогресс */}
-        <div className="mb-8">
-            {/* <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">
-                Прогресс
-                </span>
-                <span className="text-sm text-gray-500">
-                {sessionStats.total} из {sessionStats.totalWords} слов
-                </span>
-            </div> */}
-            <ProgressBar 
-                value={getProgress()}
-                max={100}
-                className="h-2"
-                color="blue"
-                showSessionProgress={true}
-                currentSession={currentSession}
-                remainingWords={remainingWords}
-                reviewMode={reviewMode}
-                currentRound={currentRound}
-            />
-        </div>
+        {/* Карточка со словом */}
+        <Card className="mb-6">
+          <CardContent className="p-8 text-center">
+            <div className="space-y-4">
+              {/* Основное слово */}
+              <div className="text-3xl font-bold text-gray-900">
+                {wordToShow}
+              </div>
+              
+              {/* Транскрипция (если есть) */}
+              {currentReviewWord.transcription && currentDirection === 'LEARNING_TO_NATIVE' && (
+                <div className="text-lg text-gray-500">
+                  [{currentReviewWord.transcription}]
+                </div>
+              )}
+              
+              {/* Пример (если есть) */}
+              {currentReviewWord.example && (
+                <div className="text-sm text-gray-600 italic max-w-md mx-auto">
+                  {currentReviewWord.example}
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
 
-        {/* Контент тренировки */}
+        {/* Интерфейс в зависимости от режима */}
         <AnimatePresence mode="wait">
-          {/* Режим Recognition */}
-          {reviewMode === 'RECOGNITION' && currentReviewWord && (
+          {reviewMode === 'RECOGNITION' ? (
             <motion.div
               key="recognition"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="space-y-6"
+              className="space-y-4"
             >
-              {/* Карточка со словом */}
-              <Card className="border-2 border-gray-200">
-                <CardContent className="p-8 text-center">
-                  <div className="space-y-4">
-                    <h2 className="text-3xl font-bold text-gray-900">
-                      {getWordToShow()}
-                    </h2>
-                    {currentReviewWord.transcription && (
-                      <p className="text-lg text-gray-600">
-                        [{currentReviewWord.transcription}]
-                      </p>
-                    )}
-                    {currentReviewWord.example && !showTranslation && (
-                      <p className="text-gray-700 italic">
-                        "{currentReviewWord.example}"
-                      </p>
-                    )}
-                    <div className="pt-4">
-                      <Button
-                        onClick={() => setShowTranslation(!showTranslation)}
-                        variant="outline"
-                        className="flex items-center space-x-2"
-                      >
-                        {showTranslation ? (
-                          <EyeSlashIcon className="h-4 w-4" />
-                        ) : (
-                          <EyeIcon className="h-4 w-4" />
-                        )}
-                        <span>
-                          {showTranslation ? 'Скрыть' : 'Показать'} перевод
-                        </span>
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Перевод */}
-              <AnimatePresence>
-                {showTranslation && (
-                  <motion.div
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    exit={{ opacity: 0, height: 0 }}
-                  >
-                    <Card className="border-2 border-blue-200 bg-blue-50">
-                      <CardContent className="p-6 text-center">
-                        <h3 className="text-xl font-semibold text-blue-900">
-                          {getExpectedAnswer()}
-                        </h3>
-                      </CardContent>
-                    </Card>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-
-              {/* Кнопки оценки */}
-              {showTranslation && (
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-4"
-                >
-                  {RATING_OPTIONS.map((option) => (
+              {!showTranslation ? (
+                <Card>
+                  <CardContent className="p-6 text-center">
                     <Button
-                      key={option.value}
-                      onClick={() => handleSubmitRating(option.value)}
-                      className={`${option.color} text-white h-16 flex flex-col items-center justify-center space-y-1`}
+                      onClick={() => setShowTranslation(true)}
+                      className="flex items-center gap-2"
                     >
-                      <span className="text-xl">{option.emoji}</span>
-                      <span className="text-sm font-medium">{option.label}</span>
+                      <EyeIcon className="h-4 w-4" />
+                      Показать перевод
                     </Button>
-                  ))}
-                </motion.div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="p-6 text-center">
+                      <div className="text-xl font-medium text-green-700 mb-4">
+                        {expectedAnswer}
+                      </div>
+                      <Button
+                        variant="ghost"
+                        onClick={() => setShowTranslation(false)}
+                        className="flex items-center gap-2 text-sm"
+                      >
+                        <EyeSlashIcon className="h-4 w-4" />
+                        Скрыть
+                      </Button>
+                    </CardContent>
+                  </Card>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {RATING_OPTIONS.map((option) => (
+                      <Button
+                        key={option.value}
+                        onClick={() => handleSubmitRating(option.value)}
+                        className={`${option.color} text-white p-4 h-auto flex flex-col items-center gap-2`}
+                      >
+                        <span className="text-2xl">{option.emoji}</span>
+                        <div className="text-center">
+                          <div className="font-medium">{option.label}</div>
+                          <div className="text-xs opacity-90">{option.description}</div>
+                        </div>
+                      </Button>
+                    ))}
+                  </div>
+                </div>
               )}
             </motion.div>
-          )}
-
-          {/* Режимы ввода */}
-          {(reviewMode === 'TRANSLATION_INPUT' || reviewMode === 'REVERSE_INPUT') && currentReviewWord && (
+          ) : (
             <motion.div
               key="input"
               initial={{ opacity: 0, y: 20 }}
@@ -662,13 +660,11 @@ const getProgress = () => {
               exit={{ opacity: 0, y: -20 }}
             >
               <TranslationInput
-                word={getWordToShow()}
-                expectedAnswer={getExpectedAnswer()}
-                direction={currentDirection}
-                wordId={currentReviewWord.id}
-                transcription={currentReviewWord.transcription}
-                example={currentReviewWord.example}
+                correctAnswer={expectedAnswer}
                 onSubmit={handleTranslationSubmit}
+                reviewMode={reviewMode}
+                currentWord={currentReviewWord}
+                direction={currentDirection}
               />
             </motion.div>
           )}

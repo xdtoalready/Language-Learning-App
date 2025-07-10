@@ -1,4 +1,4 @@
-// components/ui/Input.tsx
+// components/ui/Input.tsx - Обновленная версия
 import React, { forwardRef } from 'react';
 import { cn } from '@/lib/utils';
 
@@ -7,6 +7,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   helperText?: string;
   error?: string;
   variant?: 'default' | 'error';
+  wrapperClassName?: string; // ✅ Новый проп для управления классами обертки
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -16,6 +17,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     error,
     variant = 'default',
     className,
+    wrapperClassName,
     type,
     ...props 
   }, ref) => {
@@ -29,7 +31,10 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const currentVariant = error ? 'error' : variant;
 
     return (
-      <div className="space-y-1 mb-4">
+      <div className={cn(
+        "space-y-1 mb-4", // Дефолтные классы
+        wrapperClassName   // ✅ Возможность переопределить через проп
+      )}>
         {label && (
           <label className="block text-sm font-medium text-gray-700">
             {label}
