@@ -34,6 +34,7 @@ import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import DashboardLayout from '@/components/layout/DashboardLayout';
+import { AchievementsList } from '@/components/ui/Achievements';
 import {
   formatDate,
   formatDateShort,
@@ -72,7 +73,13 @@ export default function StatsPage() {
 
   useEffect(() => {
     loadStatsOnce();
-  }, []); // 🔥 Пустой массив - загружаем только при монтировании!
+    
+    // Добавьте загрузку достижений
+    if (!isLoadingAchievements && achievements.length === 0) {
+      loadAchievements().catch(console.error);
+      loadAchievementProgress().catch(console.error);
+    }
+  }, [loadStatsOnce, loadAchievements, loadAchievementProgress, isLoadingAchievements, achievements.length]);
 
   const handleUpdateGoal = async () => {
     const goal = parseInt(newGoal);
