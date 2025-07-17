@@ -59,6 +59,21 @@ export default function FriendProfilePage() {
   // Загружаем профиль друга
   useEffect(() => {
     const loadFriendProfile = async () => {
+      try {
+        setIsLoading(true);
+        
+        const data = await apiClient.getFriendProfile(friendId);
+        setFriendProfile(data.friend);
+        
+      } catch (error) {
+        console.error('Error loading friend profile:', error);
+        toast.error('Ошибка загрузки профиля друга');
+        router.push('/friends');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     const loadFriendAchievements = async () => {
       try {
         const data = await apiClient.getPublicUserAchievements(friendId);
@@ -71,25 +86,6 @@ export default function FriendProfilePage() {
     if (friendId) {
       loadFriendProfile();
       loadFriendAchievements();
-    }
-    
-    try {
-        setIsLoading(true);
-        
-        const data = await apiClient.getFriendProfile(friendId);
-        setFriendProfile(data.friend);
-        
-    } catch (error) {
-        console.error('Error loading friend profile:', error);
-        toast.error('Ошибка загрузки профиля друга');
-        router.push('/friends');
-    } finally {
-        setIsLoading(false);
-    }
-    };
-
-    if (friendId) {
-      loadFriendProfile();
     }
   }, [friendId, router]);
 
