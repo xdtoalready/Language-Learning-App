@@ -25,6 +25,7 @@ import { formatDate, getStreakEmoji, LANGUAGES } from '@/lib/utils';
 import { useFriends } from '@/store/useStore';
 import apiClient from '@/lib/api';
 import { FriendWordsTable } from '@/components/ui/FriendWordsTable';
+import { AchievementsList } from '@/components/ui/Achievements';
 
 interface FriendProfile {
   id: string;
