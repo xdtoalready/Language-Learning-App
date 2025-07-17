@@ -1,4 +1,5 @@
-// app/stats/page.tsx
+// frontend/app/stats/page.tsx - Обновленная версия с достижениями
+
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
@@ -10,7 +11,8 @@ import {
   CalendarDaysIcon,
   AcademicCapIcon,
   ClockIcon,
-  Cog6ToothIcon
+  Cog6ToothIcon,
+  StarIcon
 } from '@heroicons/react/24/outline';
 import {
   LineChart,
@@ -33,6 +35,7 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Modal } from '@/components/ui/Modal';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { AchievementsGrid, AchievementsSummary } from '@/components/ui/AchievementsGrid';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import {
   formatDate,
@@ -47,24 +50,24 @@ export default function StatsPage() {
   const [showGoalModal, setShowGoalModal] = useState(false);
   const [newGoal, setNewGoal] = useState('');
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
+  const [activeTab, setActiveTab] = useState<'overview' | 'achievements' | 'progress'>('overview');
+  const [achievementFilter, setAchievementFilter] = useState<'all' | 'completed' | 'incomplete'>('all');
   
   const { userStats, isLoadingStats, loadUserStats, updateDailyGoal } = useStats();
   const { user } = useAuth();
 
-  // Мемоизированная функция загрузки статистики - ОДИН РАЗ
+  // Мемоизированная функция загрузки статистики
   const loadStatsOnce = useCallback(() => {
     if (!hasLoadedInitially && !userStats && !isLoadingStats) {
       console.log('📈 StatsPage: Первичная загрузка статистики...');
       loadUserStats().catch(console.error);
       setHasLoadedInitially(true);
-    } else if (hasLoadedInitially) {
-      console.log('✅ StatsPage: Статистика уже загружена или загружается');
     }
   }, [hasLoadedInitially, userStats, isLoadingStats, loadUserStats]);
 
   useEffect(() => {
     loadStatsOnce();
-  }, []); // 🔥 Пустой массив - загружаем только при монтировании!
+  }, []);
 
   const handleUpdateGoal = async () => {
     const goal = parseInt(newGoal);
@@ -89,16 +92,40 @@ export default function StatsPage() {
   };
 
   // Данные для графиков
-  const masteryData = userStats?.masteryDistribution ? Object.entries(userStats.masteryDistribution).map(([level, count]) => ({
-    name: MASTERY_LEVELS[parseInt(level)]?.name || `Уровень ${level}`,
-    value: count,
-    color: MASTERY_LEVELS[parseInt(level)]?.color || '#gray-500'
-  })) : [];
+  const masteryData = userStats?.masteryDistribution ? 
+    Object.entries(userStats.masteryDistribution).map(([level, count]) => ({
+      name: MASTERY_LEVELS[parseInt(level)]?.name || `Уровень ${level}`,
+      value: count,
+      color: MASTERY_LEVELS[parseInt(level)]?.color || '#gray-500'
+    })) : [];
 
   const weeklyData = userStats?.weeklyProgress || [];
+  const achievements = userStats?.achievements || [];
+  const achievementProgress = userStats?.achievementProgress || { completed: 0, total: 0, percentage: 0 };
 
-  // Цвета для графиков
+  // Фильтрация достижений
+  const filteredAchievements = achievements.filter(achievement => {
+    switch (achievementFilter) {
+      case 'completed':
+        return achievement.achieved;
+      case 'incomplete':
+        return !achievement.achieved;
+      default:
+        return true;
+    }
+  });
+
   const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'];
+
+  if (isLoadingStats) {
+    return (
+      <DashboardLayout>
+        <div className="flex items-center justify-center h-64">
+          <LoadingSpinner size="lg" />
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout>
@@ -126,6 +153,7 @@ export default function StatsPage() {
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
+            className="flex items-center gap-3"
           >
             <Button
               onClick={openGoalModal}
@@ -138,93 +166,50 @@ export default function StatsPage() {
           </motion.div>
         </div>
 
-        {isLoadingStats ? (
-          <div className="flex justify-center py-12">
-            <LoadingSpinner size="lg" />
+        {/* Вкладки */}
+        <div className="mb-8">
+          <div className="border-b border-gray-200">
+            <nav className="-mb-px flex space-x-8">
+              <button
+                onClick={() => setActiveTab('overview')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'overview'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <ChartBarIcon className="h-4 w-4 inline mr-2" />
+                Обзор
+              </button>
+              <button
+                onClick={() => setActiveTab('achievements')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'achievements'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <TrophyIcon className="h-4 w-4 inline mr-2" />
+                Достижения ({achievementProgress.completed}/{achievementProgress.total})
+              </button>
+              <button
+                onClick={() => setActiveTab('progress')}
+                className={`py-2 px-1 border-b-2 font-medium text-sm ${
+                  activeTab === 'progress'
+                    ? 'border-blue-500 text-blue-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                }`}
+              >
+                <CalendarDaysIcon className="h-4 w-4 inline mr-2" />
+                Прогресс
+              </button>
+            </nav>
           </div>
-        ) : (
-          <>
-            {/* Основные метрики */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8"
-            >
-              {/* Общие слова */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 bg-blue-100 rounded-lg">
-                      <AcademicCapIcon className="h-6 w-6 text-blue-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Изучено слов</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {user?.totalWordsLearned || 0}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+        </div>
 
-              {/* Текущий стрик */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 bg-orange-100 rounded-lg">
-                      <FireIcon className="h-6 w-6 text-orange-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Текущий стрик</p>
-                      <div className="flex items-center">
-                        <p className="text-2xl font-bold text-gray-900 mr-2">
-                          {user?.currentStreak || 0}
-                        </p>
-                        <span className="text-lg">
-                          {getStreakEmoji(user?.currentStreak || 0)}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Лучший стрик */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 bg-yellow-100 rounded-lg">
-                      <TrophyIcon className="h-6 w-6 text-yellow-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Лучший стрик</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {user?.longestStreak || 0}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Дни изучения */}
-              <Card>
-                <CardContent className="p-6">
-                  <div className="flex items-center">
-                    <div className="p-3 bg-green-100 rounded-lg">
-                      <CalendarDaysIcon className="h-6 w-6 text-green-600" />
-                    </div>
-                    <div className="ml-4">
-                      <p className="text-sm font-medium text-gray-600">Дней изучения</p>
-                      <p className="text-2xl font-bold text-gray-900">
-                        {userStats?.totalStudyDays || 0}
-                      </p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-
+        {/* Контент вкладок */}
+        {activeTab === 'overview' && (
+          <div className="space-y-8">
             {/* Дневной прогресс */}
             {userStats?.dailyProgress && (
               <motion.div
@@ -252,14 +237,14 @@ export default function StatsPage() {
                             Повторения сегодня
                           </span>
                           <span className="text-sm text-gray-600">
-                            {Math.round((userStats.dailyProgress.completed / userStats.dailyProgress.goal) * 100)}%
+                            {userStats.dailyProgress.percentage}%
                           </span>
                         </div>
                         <div className="w-full bg-gray-200 rounded-full h-2">
                           <div
                             className="bg-blue-600 h-2 rounded-full transition-all duration-300"
                             style={{
-                              width: `${Math.min((userStats.dailyProgress.completed / userStats.dailyProgress.goal) * 100, 100)}%`
+                              width: `${Math.min(userStats.dailyProgress.percentage, 100)}%`
                             }}
                           ></div>
                         </div>
@@ -279,13 +264,24 @@ export default function StatsPage() {
               </motion.div>
             )}
 
+            {/* Сводка достижений */}
+            {achievements.length > 0 && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+              >
+                <AchievementsSummary achievements={achievements} />
+              </motion.div>
+            )}
+
             {/* Графики */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
               {/* Распределение по уровням мастерства */}
               <motion.div
                 initial={{ opacity: 0, x: -20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
+                transition={{ delay: 0.5 }}
               >
                 <Card>
                   <CardHeader>
@@ -309,7 +305,7 @@ export default function StatsPage() {
                               dataKey="value"
                             >
                               {masteryData.map((entry, index) => (
-                                <Cell key={`pie-cell-${index}-${entry.name}`} fill={COLORS[index % COLORS.length]} />
+                                <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                               ))}
                             </Pie>
                             <Tooltip />
@@ -325,11 +321,11 @@ export default function StatsPage() {
                 </Card>
               </motion.div>
 
-              {/* Еженедельный прогресс */}
+              {/* Недельный прогресс */}
               <motion.div
                 initial={{ opacity: 0, x: 20 }}
                 animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
+                transition={{ delay: 0.6 }}
               >
                 <Card>
                   <CardHeader>
@@ -365,94 +361,171 @@ export default function StatsPage() {
                 </Card>
               </motion.div>
             </div>
+          </div>
+        )}
 
-            {/* Достижения */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
-            >
-              <Card>
-                <CardHeader>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Ваши достижения
-                  </h3>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Достижение: Первые слова */}
-                    <div key="achievement-first-word" className={`p-4 rounded-lg border-2 ${
-                      (user?.totalWordsLearned || 0) >= 1 
-                        ? 'border-green-200 bg-green-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}>
-                      <div className="flex items-center mb-2">
-                        <AcademicCapIcon className={`h-6 w-6 mr-2 ${
-                          (user?.totalWordsLearned || 0) >= 1 ? 'text-green-600' : 'text-gray-400'
-                        }`} />
-                        <h4 className="font-medium">Первые шаги</h4>
+        {/* Вкладка достижений */}
+        {activeTab === 'achievements' && (
+          <div className="space-y-6">
+            {/* Фильтры достижений */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-4">
+                <span className="text-sm font-medium text-gray-700">Показать:</span>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => setAchievementFilter('all')}
+                    className={`px-3 py-1 rounded-full text-sm ${
+                      achievementFilter === 'all'
+                        ? 'bg-blue-100 text-blue-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Все ({achievements.length})
+                  </button>
+                  <button
+                    onClick={() => setAchievementFilter('completed')}
+                    className={`px-3 py-1 rounded-full text-sm ${
+                      achievementFilter === 'completed'
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Выполнено ({achievementProgress.completed})
+                  </button>
+                  <button
+                    onClick={() => setAchievementFilter('incomplete')}
+                    className={`px-3 py-1 rounded-full text-sm ${
+                      achievementFilter === 'incomplete'
+                        ? 'bg-orange-100 text-orange-700'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    В процессе ({achievements.length - achievementProgress.completed})
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <StarIcon className="h-5 w-5 text-yellow-500" />
+                <span className="text-sm font-medium text-gray-700">
+                  Прогресс: {achievementProgress.percentage}%
+                </span>
+              </div>
+            </div>
+
+            {/* Сетка достижений */}
+            <AchievementsGrid 
+              achievements={filteredAchievements}
+              showOnlyAchieved={achievementFilter === 'completed'}
+            />
+          </div>
+        )}
+
+        {/* Вкладка прогресса */}
+        {activeTab === 'progress' && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {/* Общая статистика */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.1 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Общая статистика
+                    </h3>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Всего слов</span>
+                      <span className="font-medium">{userStats?.totals.words || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Всего повторений</span>
+                      <span className="font-medium">{userStats?.totals.reviews || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Друзей</span>
+                      <span className="font-medium">{userStats?.totals.friends || 0}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Достижений</span>
+                      <span className="font-medium">{achievementProgress.completed}/{achievementProgress.total}</span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+
+              {/* Статистика стрика */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.2 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Стрик изучения
+                    </h3>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-center">
+                      <div className="text-4xl mb-2">
+                        {getStreakEmoji(userStats?.user.currentStreak || 0)}
                       </div>
-                      <p className="text-sm text-gray-600">Изучить первое слово</p>
-                      <div className="mt-2">
-                        <Badge variant={
-                          (user?.totalWordsLearned || 0) >= 1 ? 'success' : 'secondary'
-                        }>
-                          {(user?.totalWordsLearned || 0) >= 1 ? 'Выполнено' : 'В процессе'}
-                        </Badge>
+                      <div className="text-2xl font-bold text-gray-900">
+                        {userStats?.user.currentStreak || 0}
+                      </div>
+                      <div className="text-sm text-gray-600">
+                        дней подряд
                       </div>
                     </div>
-
-                    {/* Достижение: Стрик */}
-                    <div key="achievement-week-streak" className={`p-4 rounded-lg border-2 ${
-                      (user?.currentStreak || 0) >= 7 
-                        ? 'border-orange-200 bg-orange-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}>
-                      <div className="flex items-center mb-2">
-                        <FireIcon className={`h-6 w-6 mr-2 ${
-                          (user?.currentStreak || 0) >= 7 ? 'text-orange-600' : 'text-gray-400'
-                        }`} />
-                        <h4 className="font-medium">Неделя подряд</h4>
-                      </div>
-                      <p className="text-sm text-gray-600">Изучать 7 дней подряд</p>
-                      <div className="mt-2">
-                        <Badge variant={
-                          (user?.currentStreak || 0) >= 7 ? 'warning' : 'secondary'
-                        }>
-                          {(user?.currentStreak || 0) >= 7 ? 'Выполнено' : `${user?.currentStreak || 0}/7`}
-                        </Badge>
-                      </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Лучший стрик</span>
+                      <span className="font-medium">{userStats?.user.longestStreak || 0} дней</span>
                     </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
 
-                    {/* Достижение: Много слов */}
-                    <div key="achievement-many-words" className={`p-4 rounded-lg border-2 ${
-                      (user?.totalWordsLearned || 0) >= 100 
-                        ? 'border-purple-200 bg-purple-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}>
-                      <div className="flex items-center mb-2">
-                        <TrophyIcon className={`h-6 w-6 mr-2 ${
-                          (user?.totalWordsLearned || 0) >= 100 ? 'text-purple-600' : 'text-gray-400'
-                        }`} />
-                        <h4 className="font-medium">Знаток слов</h4>
-                      </div>
-                      <p className="text-sm text-gray-600">Изучить 100 слов</p>
-                      <div className="mt-2">
-                        <Badge variant={
-                          (user?.totalWordsLearned || 0) >= 100 ? 'primary' : 'secondary'
-                        }>
-                          {(user?.totalWordsLearned || 0) >= 100 
-                            ? 'Выполнено' 
-                            : `${user?.totalWordsLearned || 0}/100`
-                          }
-                        </Badge>
-                      </div>
+              {/* Статистика изучения */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <Card>
+                  <CardHeader>
+                    <h3 className="text-lg font-semibold text-gray-900">
+                      Изучение слов
+                    </h3>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">Выучено</span>
+                      <span className="font-medium text-green-600">
+                        {userStats?.learningStats.wordsMastered || 0}
+                      </span>
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          </>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">В процессе</span>
+                      <span className="font-medium text-blue-600">
+                        {userStats?.learningStats.wordsInProgress || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-600">На сегодня</span>
+                      <span className="font-medium text-orange-600">
+                        {userStats?.learningStats.wordsToday || 0}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            </div>
+          </div>
         )}
       </div>
 

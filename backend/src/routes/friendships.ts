@@ -10,6 +10,7 @@ import {
   removeFriend,
   getFriendProfile,
   getFriendWords,
+  getFriendAchievements,
   copyFriendWord
 } from '../controllers/friendshipController';
 import { authenticateToken } from '../middleware/auth';
@@ -34,5 +35,5 @@ router.get('/clouds', getFriendsWithClouds);
 router.get('/:friendId/profile', getFriendProfile);
 router.get('/:friendId/words', authenticateToken, getFriendWords);
 router.post('/:friendId/words/:wordId/copy', authenticateToken, copyFriendWord);
-
+router.get('/:friendId/achievements', authenticateToken, getFriendAchievements);
 export default router;

@@ -79,6 +79,34 @@ class ApiClient {
     }
   }
 
+  /**
+ * Получить достижения пользователя
+ */
+async getUserAchievements() {
+  return this.request<{
+    achievements: Achievement[];
+    progress: {
+      completed: number;
+      total: number;
+      percentage: number;
+    };
+  }>('/stats/achievements');
+}
+
+/**
+ * Получить достижения друга
+ */
+async getFriendAchievements(friendId: string) {
+  return this.request<{
+    achievements: Achievement[];
+    progress: {
+      completed: number;
+      total: number;
+      percentage: number;
+    };
+  }>(`/friendships/${friendId}/achievements`);
+}
+
   // ====================== AUTH ======================
   
   // ИСПРАВЛЕНО: Принимает объект с credentials

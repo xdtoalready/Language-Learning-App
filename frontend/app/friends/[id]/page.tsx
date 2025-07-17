@@ -25,6 +25,7 @@ import { formatDate, getStreakEmoji, LANGUAGES } from '@/lib/utils';
 import { useFriends } from '@/store/useStore';
 import apiClient from '@/lib/api';
 import { FriendWordsTable } from '@/components/ui/FriendWordsTable';
+import { FriendAchievements } from '@/components/friends/FriendAchievements';
 
 interface FriendProfile {
   id: string;
@@ -247,7 +248,7 @@ export default function FriendProfilePage() {
           </Card>
         </motion.div>
 
-        {/* НОВАЯ СЕКЦИЯ: Изучаемые слова */}
+        {/* Изучаемые слова */}
         {friendProfile.isFriend && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -260,6 +261,19 @@ export default function FriendProfilePage() {
             />
           </motion.div>
         )}
+
+        {/* Достижения друга */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.4 }}
+          className="space-y-6"
+        >
+          <FriendAchievements 
+            friendId={friendId}
+            friendName={friendProfile?.username || 'Друг'}
+          />
+        </motion.div>
 
         {/* Облачко мотивации */}
         {friendProfile.isFriend && (

@@ -92,6 +92,145 @@ export const updateUserActivity = async (userId: string): Promise<void> => {
 };
 
 /**
+ * Рассчитывает количество дней, когда была выполнена дневная цель
+ */
+function calculatePerfectDays(reviews: any[], dailyGoal: number): number {
+  const reviewsByDay = reviews.reduce((acc, review) => {
+    const day = review.createdAt.toISOString().split('T')[0];
+    acc[day] = (acc[day] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  return Object.values(reviewsByDay).filter(count => count >= dailyGoal).length;
+}
+
+/**
+ * Рассчитывает статистику времени изучения
+ */
+function calculateTimeStats(reviews: any[]): { earlyMorningDays: number; lateNightDays: number } {
+  const activityByDay = reviews.reduce((acc, review) => {
+    const date = new Date(review.createdAt);
+    const day = date.toISOString().split('T')[0];
+    const hour = date.getHours();
+    
+    if (!acc[day]) {
+      acc[day] = { earlyMorning: false, lateNight: false };
+    }
+    
+    if (hour < 8) {
+      acc[day].earlyMorning = true;
+    }
+    
+    if (hour >= 22) {
+      acc[day].lateNight = true;
+    }
+    
+    return acc;
+  }, {} as Record<string, { earlyMorning: boolean; lateNight: boolean }>);
+
+  return {
+    earlyMorningDays: Object.values(activityByDay).filter(day => day.earlyMorning).length,
+    lateNightDays: Object.values(activityByDay).filter(day => day.lateNight).length
+  };
+}
+
+/**
+ * Получить достижения друга
+ */
+export const getFriendAchievements = async (req: AuthRequest, res: Response): Promise<void> => {
+  try {
+    const userId = req.userId!;
+    const { friendId } = req.params;
+
+    // Проверяем, что пользователи действительно друзья
+    const friendship = await prisma.friendship.findFirst({
+      where: {
+        OR: [
+          { userId, friendId, status: 'accepted' },
+          { userId: friendId, friendId: userId, status: 'accepted' }
+        ]
+      }
+    });
+
+    if (!friendship) {
+      res.status(403).json({ error: 'Вы не являетесь друзьями' });
+      return;
+    }
+
+    // Получаем информацию о друге
+    const friend = await prisma.user.findUnique({
+      where: { id: friendId },
+      select: {
+        id: true,
+        username: true,
+        currentStreak: true,
+        longestStreak: true,
+        totalWordsLearned: true,
+        dailyGoal: true,
+        joinDate: true,
+        lastActiveDate: true,
+        _count: {
+          select: {
+            reviews: true
+          }
+        }
+      }
+    });
+
+    if (!friend) {
+      res.status(404).json({ error: 'Друг не найден' });
+      return;
+    }
+
+    // Получаем ревью друга за последние 30 дней для расчета дополнительных метрик
+    const monthAgo = new Date();
+    monthAgo.setDate(monthAgo.getDate() - 30);
+
+    const recentReviews = await prisma.review.findMany({
+      where: {
+        userId: friendId,
+        createdAt: { gte: monthAgo }
+      },
+      select: {
+        rating: true,
+        createdAt: true
+      }
+    });
+
+    const perfectDays = calculatePerfectDays(recentReviews, friend.dailyGoal);
+    const timeStats = calculateTimeStats(recentReviews);
+
+    const friendWithStats = {
+      ...friend,
+      totalReviews: friend._count.reviews,
+      perfectDays,
+      earlyMorningDays: timeStats.earlyMorningDays,
+      lateNightDays: timeStats.lateNightDays
+    };
+
+    // Рассчитываем достижения друга
+    const achievements = checkAchievements(friendWithStats);
+    const achievementProgress = getAchievementProgress(achievements);
+
+    res.json({
+      achievements,
+      progress: achievementProgress,
+      friend: {
+        id: friend.id,
+        username: friend.username,
+        currentStreak: friend.currentStreak,
+        totalWordsLearned: friend.totalWordsLearned,
+        totalReviews: friend._count.reviews
+      }
+    });
+
+  } catch (error) {
+    console.error('Get friend achievements error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+};
+
+/**
  * Получить облачки друзей
  */
 export const getFriendsWithClouds = async (req: AuthRequest, res: Response): Promise<void> => {

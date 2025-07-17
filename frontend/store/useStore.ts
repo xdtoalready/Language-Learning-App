@@ -59,6 +59,10 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   pendingRequests: any[];
   isLoadingFriends: boolean;
 
+  // Achievements state
+  achievements: Achievement[];
+  isLoadingAchievements: boolean;
+
   // Friendship actions
   loadFriends: () => Promise<void>;
   loadPendingRequests: () => Promise<void>;
@@ -86,6 +90,10 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
   
   // UI actions
   setLoading: (type: 'auth' | 'words' | 'stats', value: boolean) => void;
+
+  // Achievements actions
+  loadAchievements: () => Promise<void>;
+  loadFriendAchievements: (friendId: string) => Promise<Achievement[]>;
 }
 
 // Функция для проверки наличия валидного токена
@@ -144,6 +152,10 @@ export const useStore = create<AppStore>((set, get) => ({
   friends: [],
   pendingRequests: [],
   isLoadingFriends: false,
+
+  // Achievements state
+  achievements: [],
+  isLoadingAchievements: false,
 
   // Инициализация аутентификации
   initializeAuth: async () => {
@@ -227,6 +239,32 @@ export const useStore = create<AppStore>((set, get) => ({
     } catch (error) {
       console.error('❌ Ошибка входа:', error);
       set({ isLoading: false });
+      throw error;
+    }
+  },
+
+  // Achievements actions
+  loadAchievements: async () => {
+    set({ isLoadingAchievements: true });
+    try {
+      const response = await apiClient.getUserAchievements();
+      set({ 
+        achievements: response.achievements,
+        isLoadingAchievements: false 
+      });
+    } catch (error) {
+      console.error('Failed to load achievements:', error);
+      set({ isLoadingAchievements: false });
+      throw error;
+    }
+  },
+
+  loadFriendAchievements: async (friendId: string) => {
+    try {
+      const response = await apiClient.getFriendAchievements(friendId);
+      return response.achievements;
+    } catch (error) {
+      console.error('Failed to load friend achievements:', error);
       throw error;
     }
   },
@@ -1008,6 +1046,13 @@ export const useReview = () => useStore((state) => ({
   startReviewSession: state.startReviewSession,
   submitReview: state.submitReview,
   endReviewSession: state.endReviewSession
+}));
+
+export const useAchievements = () => useStore((state) => ({
+  achievements: state.achievements,
+  isLoadingAchievements: state.isLoadingAchievements,
+  loadAchievements: state.loadAchievements,
+  loadFriendAchievements: state.loadFriendAchievements
 }));
 
 export const useStats = () => useStore((state) => ({

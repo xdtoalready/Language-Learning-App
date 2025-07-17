@@ -18,6 +18,69 @@ export interface User {
   };
 }
 
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  type: 'streak' | 'words' | 'reviews' | 'special';
+  difficulty: 'bronze' | 'silver' | 'gold' | 'platinum';
+  achieved: boolean;
+  progress: number;
+  maxProgress: number;
+  achievedAt?: Date;
+  reward?: {
+    points: number;
+    badge: string;
+  };
+}
+
+export interface UserStats {
+  user: {
+    currentStreak: number;
+    longestStreak: number;
+    totalWordsLearned: number;
+    joinDate: string;
+    lastActiveDate?: string;
+    memberFor: number;
+  };
+  dailyProgress: {
+    completed: number;
+    goal: number;
+    percentage: number;
+  };
+  learningStats: {
+    wordsInProgress: number;
+    wordsMastered: number;
+    wordsToday: number;
+    totalWords: number;
+    masteryDistribution: {
+      0: number;
+      1: number;
+      2: number;
+      3: number;
+      4: number;
+      5: number;
+    };
+  };
+  weeklyActivity: Array<{
+    date: string;
+    reviewCount: number;
+    averageRating: number;
+  }>;
+  weeklyAverageRating: number;
+  modeStats: {
+    recognition: { total: number; averageRating: number; };
+    translationInput: { total: number; averageRating: number; accuracy: number; };
+    reverseInput: { total: number; averageRating: number; accuracy: number; };
+  };
+  totals: {
+    words: number;
+    reviews: number;
+    friends: number;
+  };
+}
+
 export interface Word {
   id: string;
   word: string;
@@ -136,52 +199,6 @@ export interface WordStats {
   };
 }
 
-export interface UserStats {
-  user: {
-    currentStreak: number;
-    longestStreak: number;
-    totalWordsLearned: number;
-    joinDate: string;
-    lastActiveDate?: string;
-    memberFor: number;
-  };
-  dailyProgress: {
-    completed: number;
-    goal: number;
-    percentage: number;
-  };
-  learningStats: {
-    wordsInProgress: number;
-    wordsMastered: number;
-    wordsToday: number;
-    totalWords: number;
-    masteryDistribution: {
-      0: number;
-      1: number;
-      2: number;
-      3: number;
-      4: number;
-      5: number;
-    };
-  };
-  weeklyActivity: Array<{
-    date: string;
-    reviewCount: number;
-    averageRating: number;
-  }>;
-  weeklyAverageRating: number;
-  // НОВОЕ: статистика по режимам
-  modeStats: {
-    recognition: { total: number; averageRating: number; };
-    translationInput: { total: number; averageRating: number; accuracy: number; };
-    reverseInput: { total: number; averageRating: number; accuracy: number; };
-  };
-  totals: {
-    words: number;
-    reviews: number;
-    friends: number;
-  };
-}
 
 export interface ReviewStats {
   totalReviews: number;
