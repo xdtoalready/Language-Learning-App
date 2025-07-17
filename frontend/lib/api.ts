@@ -79,6 +79,20 @@ class ApiClient {
     }
   }
 
+  // ====================== ДОСТИЖЕНИЯ ======================
+
+  async getUserAchievements() {
+    return this.request<UserAchievementsResponse>('/achievements');
+  }
+
+  async getPublicUserAchievements(userId: string) {
+    return this.request<PublicUserAchievementsResponse>(`/achievements/user/${userId}`);
+  }
+
+  async getAchievementProgress() {
+    return this.request<AchievementProgressResponse>('/achievements/progress');
+  }
+
   // ====================== AUTH ======================
   
   // ИСПРАВЛЕНО: Принимает объект с credentials

@@ -370,85 +370,23 @@ export default function StatsPage() {
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.6 }}
+              transition={{ delay: 0.3 }}
             >
               <Card>
                 <CardHeader>
-                  <h3 className="text-lg font-semibold text-gray-900">
-                    Ваши достижения
-                  </h3>
+                  <h3 className="text-xl font-semibold">Достижения</h3>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {/* Достижение: Первые слова */}
-                    <div key="achievement-first-word" className={`p-4 rounded-lg border-2 ${
-                      (user?.totalWordsLearned || 0) >= 1 
-                        ? 'border-green-200 bg-green-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}>
-                      <div className="flex items-center mb-2">
-                        <AcademicCapIcon className={`h-6 w-6 mr-2 ${
-                          (user?.totalWordsLearned || 0) >= 1 ? 'text-green-600' : 'text-gray-400'
-                        }`} />
-                        <h4 className="font-medium">Первые шаги</h4>
-                      </div>
-                      <p className="text-sm text-gray-600">Изучить первое слово</p>
-                      <div className="mt-2">
-                        <Badge variant={
-                          (user?.totalWordsLearned || 0) >= 1 ? 'success' : 'secondary'
-                        }>
-                          {(user?.totalWordsLearned || 0) >= 1 ? 'Выполнено' : 'В процессе'}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Достижение: Стрик */}
-                    <div key="achievement-week-streak" className={`p-4 rounded-lg border-2 ${
-                      (user?.currentStreak || 0) >= 7 
-                        ? 'border-orange-200 bg-orange-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}>
-                      <div className="flex items-center mb-2">
-                        <FireIcon className={`h-6 w-6 mr-2 ${
-                          (user?.currentStreak || 0) >= 7 ? 'text-orange-600' : 'text-gray-400'
-                        }`} />
-                        <h4 className="font-medium">Неделя подряд</h4>
-                      </div>
-                      <p className="text-sm text-gray-600">Изучать 7 дней подряд</p>
-                      <div className="mt-2">
-                        <Badge variant={
-                          (user?.currentStreak || 0) >= 7 ? 'warning' : 'secondary'
-                        }>
-                          {(user?.currentStreak || 0) >= 7 ? 'Выполнено' : `${user?.currentStreak || 0}/7`}
-                        </Badge>
-                      </div>
-                    </div>
-
-                    {/* Достижение: Много слов */}
-                    <div key="achievement-many-words" className={`p-4 rounded-lg border-2 ${
-                      (user?.totalWordsLearned || 0) >= 100 
-                        ? 'border-purple-200 bg-purple-50' 
-                        : 'border-gray-200 bg-gray-50'
-                    }`}>
-                      <div className="flex items-center mb-2">
-                        <TrophyIcon className={`h-6 w-6 mr-2 ${
-                          (user?.totalWordsLearned || 0) >= 100 ? 'text-purple-600' : 'text-gray-400'
-                        }`} />
-                        <h4 className="font-medium">Знаток слов</h4>
-                      </div>
-                      <p className="text-sm text-gray-600">Изучить 100 слов</p>
-                      <div className="mt-2">
-                        <Badge variant={
-                          (user?.totalWordsLearned || 0) >= 100 ? 'primary' : 'secondary'
-                        }>
-                          {(user?.totalWordsLearned || 0) >= 100 
-                            ? 'Выполнено' 
-                            : `${user?.totalWordsLearned || 0}/100`
-                          }
-                        </Badge>
-                      </div>
-                    </div>
-                  </div>
+                  {isLoadingAchievements ? (
+                    <LoadingSpinner />
+                  ) : (
+                    <AchievementsList
+                      achievements={achievements}
+                      progress={achievementProgress}
+                      showProgress={true}
+                      layout="grid"
+                    />
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

@@ -23,6 +23,7 @@ model User {
   dailyGoal         Int       @default(10)
   learningLanguage  String    @default("English") // "English", "Korean", "Chinese", etc.
   lastActiveDate    DateTime?
+  userAchievements  UserAchievement[]
   
   // Связи
   words             Word[]
@@ -34,6 +35,55 @@ model User {
   updatedAt         DateTime  @updatedAt
   
   @@map("users")
+}
+
+model Achievement {
+  id          String  @id @default(cuid())
+  key         String  @unique // уникальный ключ достижения (например, "first_word", "week_streak")
+  name        String  // название достижения
+  description String  // описание
+  icon        String  // иконка (emoji или название icon)
+  color       String  // цвет оформления
+  category    AchievementCategory
+  
+  // Условия получения
+  requirement Json    // условие для получения (например, {type: "streak", value: 7})
+  isSecret    Boolean @default(false) // скрытые достижения
+  points      Int     @default(0) // очки за достижение
+  
+  // Связи
+  userAchievements UserAchievement[]
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@map("achievements")
+}
+
+model UserAchievement {
+  id            String @id @default(cuid())
+  
+  // Связи
+  userId        String
+  user          User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  achievementId String
+  achievement   Achievement @relation(fields: [achievementId], references: [id], onDelete: Cascade)
+  
+  // Метаданные получения
+  unlockedAt    DateTime @default(now())
+  progress      Json?    // прогресс к достижению (например, {current: 5, required: 7})
+  
+  @@unique([userId, achievementId])
+  @@map("user_achievements")
+}
+
+enum AchievementCategory {
+  STREAK      // стрики
+  LEARNING    // изучение слов
+  PROGRESS    // прогресс
+  SOCIAL      // социальные
+  SPECIAL     // особые
 }
 
 model Word {

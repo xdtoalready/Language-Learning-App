@@ -1,10 +1,11 @@
-// backend/src/controllers/reviewController.ts - ОБНОВЛЕННЫЙ
+// backend/src/controllers/reviewController.ts
 
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { updateUserActivity } from './friendshipController';
 import { updateWordAfterReview } from '../utils/spacedRepetition';
 import { evaluateInput, generateHint } from '../utils/inputEvaluation';
+import { checkAndAwardAchievements } from './achievementsController';
 
 const prisma = new PrismaClient();
 
@@ -394,7 +395,7 @@ export const submitReview = async (req: AuthRequest, res: Response): Promise<voi
     }
 
     // Обновляем слово в базе данных только для ежедневных сессий
-if (session.sessionType === 'daily') {
+    if (session.sessionType === 'daily') {
       // Рассчитываем новые параметры через алгоритм интервального повторения
       const updatedParams = updateWordAfterReview({
         wordId,
@@ -462,6 +463,11 @@ if (session.sessionType === 'daily') {
           userId
         }
       });
+    }
+
+    const newAchievements = await checkAndAwardAchievements(userId);
+    if (newAchievements.length > 0) {
+      console.log(`🏆 Пользователь ${userId} получил достижения:`, newAchievements);
     }
 
     // Обновляем сессию

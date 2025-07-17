@@ -15,7 +15,7 @@ import {
   PhotoIcon
 } from '@heroicons/react/24/outline';
 import { toast } from 'react-hot-toast';
-import { useAuth, useStats, useFriends } from '@/store/useStore';
+import { useAuth, useStats, useFriends, useStore } from '@/store/useStore';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
@@ -25,6 +25,7 @@ import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { CloudStreak } from '@/components/ui/CloudStreak';
 import DashboardLayout from '@/components/layout/DashboardLayout';
 import { formatDate, getStreakEmoji, LANGUAGES } from '@/lib/utils';
+import { AchievementsSummary } from '@/components/ui/Achievements';
 
 export default function ProfilePage() {
   const { user, updateProfile, isLoading } = useAuth();
@@ -39,6 +40,13 @@ export default function ProfilePage() {
     learningLanguage: '',
     dailyGoal: 10
   });
+  const { achievements, totalAchievementPoints, loadAchievements, isLoadingAchievements } = useStore();
+
+  useEffect(() => {
+    if (user && !isLoadingAchievements && achievements.length === 0) {
+      loadAchievements().catch(console.error);
+    }
+  }, [user, loadAchievements, isLoadingAchievements, achievements.length]);
 
   // Загружаем данные при монтировании
   useEffect(() => {
@@ -379,40 +387,12 @@ export default function ProfilePage() {
               <CardHeader>
                 <h3 className="text-lg font-semibold">Достижения</h3>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className={`flex items-center gap-3 p-3 rounded-lg ${
-                  (user.currentStreak || 0) >= 7 ? 'bg-green-50' : 'bg-gray-50'
-                }`}>
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${
-                    (user.currentStreak || 0) >= 7 ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    <FireIcon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Неделя в деле</p>
-                    <p className="text-xs text-gray-500">Стрик 7 дней</p>
-                  </div>
-                  {(user.currentStreak || 0) >= 7 && (
-                    <Badge variant="success" className="ml-auto">✓</Badge>
-                  )}
-                </div>
-
-                <div className={`flex items-center gap-3 p-3 rounded-lg ${
-                  (user.totalWordsLearned || 0) >= 50 ? 'bg-blue-50' : 'bg-gray-50'
-                }`}>
-                  <div className={`flex items-center justify-center w-8 h-8 rounded-lg ${
-                    (user.totalWordsLearned || 0) >= 50 ? 'bg-blue-100 text-blue-600' : 'bg-gray-100 text-gray-400'
-                  }`}>
-                    <BookOpenIcon className="h-4 w-4" />
-                  </div>
-                  <div>
-                    <p className="font-medium text-sm">Знаток слов</p>
-                    <p className="text-xs text-gray-500">Выучить 50 слов</p>
-                  </div>
-                  {(user.totalWordsLearned || 0) >= 50 && (
-                    <Badge variant="success" className="ml-auto">✓</Badge>
-                  )}
-                </div>
+              <CardContent>
+                <AchievementsSummary
+                  achievements={achievements}
+                  totalPoints={totalAchievementPoints}
+                  maxDisplay={3}
+                />
               </CardContent>
             </Card>
 

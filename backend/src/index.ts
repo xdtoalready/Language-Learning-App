@@ -11,6 +11,8 @@ import wordRoutes from './routes/words';
 import reviewRoutes from './routes/reviews';
 import friendshipRoutes from './routes/friendships';
 import statsRoutes from './routes/stats';
+import achievementsRoutes from './routes/achievements';
+import { initializeAchievements } from './controllers/achievementsController';
 
 // Middleware
 import { errorHandler } from './middleware/errorHandler';
@@ -104,6 +106,7 @@ app.use('/api/words', wordRoutes);
 app.use('/api/reviews', reviewRoutes);
 app.use('/api/friendships', friendshipRoutes);
 app.use('/api/stats', statsRoutes);
+app.use('/api/achievements', achievementsRoutes);
 
 // 404 handler
 app.use('*', (req, res) => {
@@ -129,6 +132,8 @@ app.use('*', (req, res) => {
 
 // Error handling middleware
 app.use(errorHandler);
+
+initializeAchievements();
 
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);

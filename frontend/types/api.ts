@@ -59,7 +59,7 @@ export interface Review {
   createdAt: string;
 }
 
-// НОВОЕ: Сессия ревью
+// Сессия ревью
 export interface ReviewSession {
   sessionId: string;
   mode: ReviewMode;
@@ -70,7 +70,7 @@ export interface ReviewSession {
   startTime: string;
 }
 
-// НОВОЕ: Слово в сессии ревью
+// Слово в сессии ревью
 export interface ReviewSessionWord {
   id: string;
   word: string;
@@ -84,7 +84,7 @@ export interface ReviewSessionWord {
   isCompleted?: boolean;
 }
 
-// НОВОЕ: Результат ревью слова
+// Результат ревью слова
 export interface ReviewResult {
   rating: number;
   userInput?: string;
@@ -93,7 +93,7 @@ export interface ReviewResult {
   autoEvaluated: boolean; // автоматически оценено или пользователем
 }
 
-// НОВОЕ: Оценка ввода
+// Оценка ввода
 export interface InputEvaluation {
   score: 1 | 2 | 3 | 4;
   reason: 'exact' | 'typo' | 'synonym' | 'hint_used' | 'wrong';
@@ -101,14 +101,14 @@ export interface InputEvaluation {
   suggestions?: string[]; // возможные исправления
 }
 
-// НОВОЕ: Подсказка
+// Подсказка
 export interface Hint {
   type: 'length' | 'first_letter';
   content: string;
   used: boolean;
 }
 
-// НОВОЕ: Настройки режима тренировки
+// Настройки режима тренировки
 export interface TrainingModeSettings {
   mode: ReviewMode;
   enableHints: boolean;
@@ -120,7 +120,7 @@ export interface WordStats {
   total: number;
   mastered: number;
   dueToday: number;
-  active: number; // НОВОЕ: слова в изучении (masteryLevel < 5)
+  active: number; // слова в изучении (masteryLevel < 5)
   byMasteryLevel: {
     0: number;
     1: number;
@@ -129,7 +129,7 @@ export interface WordStats {
     4: number;
     5: number;
   };
-  byInputAccuracy?: { // НОВОЕ: статистика ввода
+  byInputAccuracy?: { // статистика ввода
     excellent: number; // 90%+ правильных
     good: number;      // 70-89%
     needs_practice: number; // <70%
@@ -170,7 +170,7 @@ export interface UserStats {
     averageRating: number;
   }>;
   weeklyAverageRating: number;
-  // НОВОЕ: статистика по режимам
+  // статистика по режимам
   modeStats: {
     recognition: { total: number; averageRating: number; };
     translationInput: { total: number; averageRating: number; accuracy: number; };
@@ -285,7 +285,7 @@ export interface ReviewSessionResponse {
   currentRound?: number; // для многораундовых режимов
 }
 
-// НОВОЕ: Ответ оценки ввода
+// Ответ оценки ввода
 export interface EvaluateInputResponse {
   evaluation: InputEvaluation;
   nextAction: 'continue' | 'retry' | 'show_answer';
@@ -303,7 +303,7 @@ export interface PaginatedResponse<T> {
   };
 }
 
-// НОВОЕ: Ответ активных слов для тренировочного полигона
+// Ответ активных слов для тренировочного полигона
 export interface ActiveWordsResponse {
   words: Word[];
   count: number;
@@ -332,4 +332,59 @@ export interface ApiError {
   error: string;
   path?: string;
   details?: any;
+}
+
+// ============== ДОСТИЖЕНИЯ ==============
+
+export type AchievementCategory = 'STREAK' | 'LEARNING' | 'PROGRESS' | 'SOCIAL' | 'SPECIAL';
+
+export interface Achievement {
+  id: string;
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  category: AchievementCategory;
+  points: number;
+  isSecret: boolean;
+  isUnlocked: boolean;
+  unlockedAt?: string | null;
+  progress?: any;
+  requirement: {
+    type: string;
+    value: number;
+  };
+}
+
+export interface AchievementProgress {
+  achievementId: string;
+  key: string;
+  name: string;
+  description: string;
+  icon: string;
+  color: string;
+  current: number;
+  required: number;
+  percentage: number;
+}
+
+export interface UserAchievementsResponse {
+  achievements: Achievement[];
+  newAchievements: string[];
+  totalPoints: number;
+}
+
+export interface PublicUserAchievementsResponse {
+  user: {
+    id: string;
+    username: string;
+  };
+  achievements: Achievement[];
+  totalPoints: number;
+  totalCount: number;
+}
+
+export interface AchievementProgressResponse {
+  progress: AchievementProgress[];
 }

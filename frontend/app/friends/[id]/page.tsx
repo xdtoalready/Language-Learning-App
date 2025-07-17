@@ -54,9 +54,25 @@ export default function FriendProfilePage() {
 
   const friendId = params.id as string;
 
+  const [friendAchievements, setFriendAchievements] = useState<any>(null);
+
   // Загружаем профиль друга
   useEffect(() => {
     const loadFriendProfile = async () => {
+    const loadFriendAchievements = async () => {
+      try {
+        const data = await apiClient.getPublicUserAchievements(friendId);
+        setFriendAchievements(data);
+      } catch (error) {
+        console.error('Ошибка загрузки достижений друга:', error);
+      }
+    };
+
+    if (friendId) {
+      loadFriendProfile();
+      loadFriendAchievements();
+    }
+    
     try {
         setIsLoading(true);
         
@@ -247,7 +263,7 @@ export default function FriendProfilePage() {
           </Card>
         </motion.div>
 
-        {/* НОВАЯ СЕКЦИЯ: Изучаемые слова */}
+        {/* Изучаемые слова */}
         {friendProfile.isFriend && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -305,6 +321,30 @@ export default function FriendProfilePage() {
             </Card>
           </motion.div>
         )}
+
+        {/* Достижения друга */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <Card>
+            <CardHeader>
+              <h3 className="text-lg font-semibold">Достижения</h3>
+            </CardHeader>
+            <CardContent>
+              {friendAchievements ? (
+                <AchievementsList
+                  achievements={friendAchievements.achievements}
+                  layout="grid"
+                  maxDisplay={6}
+                />
+              ) : (
+                <LoadingSpinner />
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       </div>
     </DashboardLayout>
   );

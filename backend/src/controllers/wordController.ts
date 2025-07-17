@@ -1,6 +1,7 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
 import { createNewWordParams, isWordDueForReview, getProgressStats } from '../utils/spacedRepetition';
+import { checkAndAwardAchievements } from './achievementsController';
 
 const prisma = new PrismaClient();
 
@@ -226,6 +227,8 @@ export const createWord = async (req: AuthRequest, res: Response): Promise<void>
         ...newWordParams
       }
     });
+
+    const newAchievements = await checkAndAwardAchievements(userId);
 
     // Обновляем счетчик слов у пользователя
     await prisma.user.update({

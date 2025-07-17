@@ -25,6 +25,20 @@ interface AuthActions {
   }>) => Promise<void>;
 }
 
+interface AchievementsState {
+  achievements: Achievement[];
+  achievementProgress: AchievementProgress[];
+  totalAchievementPoints: number;
+  isLoadingAchievements: boolean;
+  newAchievements: string[];
+}
+
+interface AchievementsActions {
+  loadAchievements: () => Promise<void>;
+  loadAchievementProgress: () => Promise<void>;
+  markNewAchievementsAsSeen: () => void;
+}
+
 interface WordsState {
   words: Word[];
   dueWords: Word[];
@@ -45,7 +59,7 @@ interface ReviewState {
   remainingWords: number;
 }
 
-interface AppStore extends AuthState, WordsState, StatsState, ReviewState {
+interface AppStore extends AuthState, WordsState, StatsState, ReviewState, AchievementsState, AchievementsActions {
   // Auth actions
   login: (emailOrUsername: string, password: string) => Promise<void>;
   register: (email: string, username: string, password: string, learningLanguage: string) => Promise<void>;
@@ -145,6 +159,12 @@ export const useStore = create<AppStore>((set, get) => ({
   pendingRequests: [],
   isLoadingFriends: false,
 
+  achievements: [],
+  achievementProgress: [],
+  totalAchievementPoints: 0,
+  isLoadingAchievements: false,
+  newAchievements: [],
+
   // Инициализация аутентификации
   initializeAuth: async () => {
     const state = get();
@@ -207,6 +227,37 @@ export const useStore = create<AppStore>((set, get) => ({
         isInitialized: true 
       });
     }
+  },
+
+    loadAchievements: async () => {
+    set({ isLoadingAchievements: true });
+    try {
+      const response = await apiClient.getUserAchievements();
+      set({
+        achievements: response.achievements,
+        totalAchievementPoints: response.totalPoints,
+        newAchievements: response.newAchievements,
+        isLoadingAchievements: false
+      });
+    } catch (error) {
+      console.error('Ошибка загрузки достижений:', error);
+      set({ isLoadingAchievements: false });
+      throw error;
+    }
+  },
+
+  loadAchievementProgress: async () => {
+    try {
+      const response = await apiClient.getAchievementProgress();
+      set({ achievementProgress: response.progress });
+    } catch (error) {
+      console.error('Ошибка загрузки прогресса достижений:', error);
+      throw error;
+    }
+  },
+
+  markNewAchievementsAsSeen: () => {
+    set({ newAchievements: [] });
   },
 
   // Auth actions
