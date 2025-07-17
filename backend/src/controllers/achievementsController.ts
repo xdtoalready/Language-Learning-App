@@ -281,6 +281,8 @@ export const getPublicUserAchievements = async (req: AuthRequest, res: Response)
       return;
     }
 
+    await checkAndAwardAchievements(targetUserId);
+
     // Получаем только открытые достижения пользователя
     const userAchievements = await prisma.userAchievement.findMany({
       where: { userId: targetUserId },

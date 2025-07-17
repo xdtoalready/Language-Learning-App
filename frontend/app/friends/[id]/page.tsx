@@ -331,11 +331,21 @@ export default function FriendProfilePage() {
             </CardHeader>
             <CardContent>
               {friendAchievements ? (
-                <AchievementsList
-                  achievements={friendAchievements.achievements}
-                  layout="grid"
-                  maxDisplay={6}
-                />
+                friendAchievements.achievements && friendAchievements.achievements.length > 0 ? (
+                  <AchievementsList
+                    achievements={friendAchievements.achievements}
+                    layout="grid"
+                    maxDisplay={6}
+                  />
+                ) : (
+                  <div className="text-center py-8">
+                    <div className="text-gray-400 text-4xl mb-2">🏆</div>
+                    <p className="text-gray-500">Пока нет достижений</p>
+                    <p className="text-sm text-gray-400 mt-1">
+                      {friendProfile?.username} еще не получил ни одного достижения
+                    </p>
+                  </div>
+                )
               ) : (
                 <LoadingSpinner />
               )}
