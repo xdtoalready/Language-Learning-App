@@ -26,7 +26,7 @@ import {
   BarChart,
   Bar
 } from 'recharts';
-import { useStats, useAuth } from '@/store/useStore';
+import { useStats, useAuth, useStore } from '@/store/useStore';
 import { Card, CardContent, CardHeader } from '@/components/ui/Card';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -50,6 +50,14 @@ export default function StatsPage() {
   
   const { userStats, isLoadingStats, loadUserStats, updateDailyGoal } = useStats();
   const { user } = useAuth();
+  const { 
+  achievements, 
+  achievementProgress, 
+  totalAchievementPoints, 
+  isLoadingAchievements, 
+  loadAchievements, 
+  loadAchievementProgress 
+} = useStore();
 
   // Мемоизированная функция загрузки статистики - ОДИН РАЗ
   const loadStatsOnce = useCallback(() => {
