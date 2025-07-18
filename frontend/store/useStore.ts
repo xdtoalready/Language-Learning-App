@@ -73,6 +73,15 @@ interface AppStore extends AuthState, WordsState, StatsState, ReviewState, Achie
   pendingRequests: any[];
   isLoadingFriends: boolean;
 
+  pagination: {
+    currentPage: number;
+    totalPages: number;
+    totalCount: number;
+    limit: number;
+    hasNext: boolean;
+    hasPrev: boolean;
+  } | null;
+
   // Friendship actions
   loadFriends: () => Promise<void>;
   loadPendingRequests: () => Promise<void>;
@@ -158,6 +167,8 @@ export const useStore = create<AppStore>((set, get) => ({
   friends: [],
   pendingRequests: [],
   isLoadingFriends: false,
+
+  pagination: null,
 
   achievements: [],
   achievementProgress: [],
@@ -378,6 +389,7 @@ export const useStore = create<AppStore>((set, get) => ({
       console.log('✅ Слова загружены:', response.words.length);
       set({ 
         words: response.words,
+        pagination: response.pagination, // Добавляем pagination
         isLoadingWords: false 
       });
     } catch (error) {

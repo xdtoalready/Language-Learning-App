@@ -29,6 +29,7 @@ import {
   MASTERY_LEVELS
 } from '@/lib/utils';
 import { Word } from '@/types/api';
+import { EditWordModal } from '@/components/ui/EditWordModal';
 
 export default function WordsPage() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -39,13 +40,27 @@ export default function WordsPage() {
   const [showDeleteModal, setShowDeleteModal] = useState<Word | null>(null);
   const [hasLoadedInitially, setHasLoadedInitially] = useState(false);
 
-  const { words, isLoadingWords, loadWords, deleteWord } = useWords();
+  const [currentPage, setCurrentPage] = useState(1);
+
+  const { words, isLoadingWords, loadWords, deleteWord, pagination } = useWords();
+
+  const totalPages = pagination?.totalPages || 1;
+  const totalCount = pagination?.totalCount || 0;
+  const hasNext = pagination?.hasNext || false;
+  const hasPrev = pagination?.hasPrev || false;
+
   const router = useRouter();
 
   // Мемоизированная функция для загрузки слов с параметрами поиска
-  const loadWordsWithParams = useCallback((params?: any) => {
+  const loadWordsWithParams = useCallback((params?: any, page = 1) => {
     console.log('📚 Загружаем слова с параметрами:', params);
-    loadWords(params);
+    const finalParams = {
+      ...params,
+      page,
+      limit: 50
+    };
+    setCurrentPage(page);
+    loadWords(finalParams);
   }, [loadWords]);
 
   // Мемоизированная debounced функция с возможностью отмены
@@ -55,11 +70,12 @@ export default function WordsPage() {
     const debouncedFn = (term: string, masteryLevel: number | null, tags: string[]) => {
       clearTimeout(timeoutId);
       timeoutId = setTimeout(() => {
+        setCurrentPage(1);
         loadWordsWithParams({
           search: term || undefined,
           masteryLevel: masteryLevel || undefined,
           tags: tags.length > 0 ? tags.join(',') : undefined
-        });
+        }, 1);
       }, 300);
     };
     
@@ -448,7 +464,61 @@ export default function WordsPage() {
             </div>
           )}
         </motion.div>
+
+        {/* Пагинация */}
+          {pagination && totalPages > 1 && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              className="mt-8 flex justify-center"
+            >
+              <div className="flex items-center gap-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage(prev => prev - 1);
+                    loadWordsWithParams({
+                      search: searchTerm || undefined,
+                      masteryLevel: selectedMasteryLevel || undefined,
+                      tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined
+                    }, currentPage - 1);
+                  }}
+                  disabled={currentPage <= 1}
+                >
+                  Назад
+                </Button>
+                
+                <span className="text-sm text-gray-600 px-4">
+                  Страница {currentPage} из {totalPages} ({totalCount} слов)
+                </span>
+                
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setCurrentPage(prev => prev + 1);
+                    loadWordsWithParams({
+                      search: searchTerm || undefined,
+                      masteryLevel: selectedMasteryLevel || undefined,
+                      tags: selectedTags.length > 0 ? selectedTags.join(',') : undefined
+                    }, currentPage + 1);
+                  }}
+                  disabled={currentPage >= totalPages}
+                >
+                  Далее
+                </Button>
+              </div>
+            </motion.div>
+          )}
       </div>
+
+      {/* Модальное окно редактирования */}
+      <EditWordModal
+        word={editingWord}
+        isOpen={!!editingWord}
+        onClose={() => setEditingWord(null)}
+      />
 
       {/* Модальное окно удаления */}
       <Modal
