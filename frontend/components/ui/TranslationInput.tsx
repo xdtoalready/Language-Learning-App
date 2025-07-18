@@ -163,8 +163,8 @@ export function TranslationInput({
 
   // ✅ Улучшенная функция оценки
   const evaluateInput = async (input: string): Promise<InputEvaluation> => {
-    const cleanInput = input.trim().toLowerCase();
-    const cleanExpected = expectedAnswer.trim().toLowerCase();
+    const cleanInput = (input || '').trim().toLowerCase();
+    const cleanExpected = (expectedAnswer || '').trim().toLowerCase();
     
     if (cleanInput === cleanExpected) {
       return {
@@ -224,9 +224,14 @@ export function TranslationInput({
     return (longer.length - levenshteinDistance(longer, shorter)) / longer.length;
   };
 
-  // ✅ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: убираем setTimeout и делаем мгновенную отправку
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
+
+    if (!wordId || !expectedAnswer) {
+      console.error('❌ Отсутствуют критически важные данные:', { wordId, expectedAnswer });
+      toast.error('Ошибка: неполные данные слова');
+      return;
+    }
     
     if (!userInput.trim() || isEvaluating || isSubmitted || disabled) {
       return;

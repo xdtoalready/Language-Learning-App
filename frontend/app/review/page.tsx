@@ -660,11 +660,14 @@ export default function ReviewPage() {
               exit={{ opacity: 0, y: -20 }}
             >
               <TranslationInput
-                correctAnswer={expectedAnswer}
-                onSubmit={handleTranslationSubmit}
-                reviewMode={reviewMode}
-                currentWord={currentReviewWord}
+                word={getWordToShow()}
+                expectedAnswer={getExpectedAnswer()}
                 direction={currentDirection}
+                wordId={currentReviewWord?.id || ''}
+                transcription={currentReviewWord?.transcription}
+                example={currentReviewWord?.example}
+                onSubmit={handleTranslationSubmit}
+                disabled={!currentReviewWord}
               />
             </motion.div>
           )}
