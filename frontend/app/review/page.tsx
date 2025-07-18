@@ -64,12 +64,14 @@ export default function ReviewPage() {
   const sessionCreatedRef = useRef(false);
   const isCreatingSession = useRef(false);
   const [forceShowResults, setForceShowResults] = useState(false);
+
+  const [showEndSessionModal, setShowEndSessionModal] = useState(false);
   
   // Читаем параметры из URL
   const urlSessionType = searchParams.get('sessionType') as 'daily' | 'training' || 'daily';
   const urlMode = searchParams.get('mode') as ReviewMode || 'RECOGNITION';
 
-  // ✅ ИСПРАВЛЕНИЕ: Сброс флагов при изменении URL параметров
+  // Сброс флагов при изменении URL параметров
   useEffect(() => {
     console.log('🔄 URL параметры изменились, сброс флагов и состояния');
     sessionCreatedRef.current = false;
@@ -78,7 +80,7 @@ export default function ReviewPage() {
     setShowTranslation(false);
   }, [urlSessionType, urlMode]);
 
-  // ✅ ИСПРАВЛЕНИЕ: Улучшенная логика сброса флагов
+  // Улучшенная логика сброса флагов
   useEffect(() => {
     // Сбрасываем флаги в любом из случаев:
     // 1. Нет активной сессии И нет состояния ревью
@@ -106,7 +108,7 @@ export default function ReviewPage() {
       return;
     }
 
-    // ✅ ИСПРАВЛЕНИЕ: Улучшенная защита с логированием
+    // Улучшенная защита с логированием
     if (sessionCreatedRef.current || isCreatingSession.current) {
       console.log('🛡️ Защита: сессия уже создается или создана', {
         sessionCreated: sessionCreatedRef.current,
@@ -210,7 +212,7 @@ export default function ReviewPage() {
     creating: isCreatingSession.current
   });
 
-  // ✅ ИСПРАВЛЕНИЕ: Экстренная активация результатов с отложенным таймером
+  // Экстренная активация результатов с отложенным таймером
   useEffect(() => {
     if (sessionStats.totalWords > 0 && sessionStats.total >= sessionStats.totalWords && !isCompleted) {
       console.log('🚨 Экстренная активация результатов по таймеру');
@@ -221,6 +223,30 @@ export default function ReviewPage() {
       return () => clearTimeout(timer);
     }
   }, [sessionStats.total, sessionStats.totalWords, isCompleted]);
+
+  // Восстановление статистики сессии при повторном входе
+useEffect(() => {
+  if (currentSession && currentSession.sessionId && sessionStats.totalWords === 0) {
+    console.log('🔄 Восстанавливаем статистику сессии');
+    
+    // Вычисляем пройденные слова на основе текущего прогресса
+    const totalWords = currentSession.totalWords || 40; // fallback
+    const completed = totalWords - remainingWords - 1; // -1 так как текущее слово еще не завершено
+    
+    setSessionStats(prev => ({
+      ...prev,
+      totalWords: totalWords,
+      total: Math.max(0, completed),
+      // Можно добавить больше логики восстановления если нужно
+    }));
+    
+    console.log('✅ Статистика восстановлена:', {
+      totalWords,
+      completed: Math.max(0, completed),
+      remaining: remainingWords
+    });
+  }
+}, [currentSession, remainingWords, sessionStats.totalWords]);
 
   const validateSession = () => {
     if (!currentSession) {
@@ -353,6 +379,31 @@ export default function ReviewPage() {
       router.push('/dashboard');
     }
   };
+
+  // обработка завершения с подтверждением
+const handleEndSessionWithConfirmation = async () => {
+  try {
+    console.log('🛑 Принудительное завершение сессии пользователем');
+    
+    if (currentSession) {
+      await endSessionNew();
+    }
+    
+    // Очищаем все локальные состояния
+    sessionCreatedRef.current = false;
+    isCreatingSession.current = false;
+    setForceShowResults(false);
+    setShowEndSessionModal(false);
+    setShowTranslation(false);
+    
+    toast.success('Сессия завершена');
+  } catch (error) {
+    console.error('❌ Ошибка при завершении сессии:', error);
+    toast.error('Ошибка при завершении сессии');
+  } finally {
+    router.push('/dashboard');
+  }
+};
 
   // Получение текста для отображения слова в зависимости от направления
   const getWordToShow = () => {
@@ -557,6 +608,15 @@ export default function ReviewPage() {
                 </Badge>
               )}
             </div>
+              {/* завершения сессии */}
+            <Button
+              variant="outline"
+              onClick={() => setShowEndSessionModal(true)}
+              className="flex items-center gap-2 text-red-600 border-red-300 hover:bg-red-50"
+            >
+              <HomeIcon className="h-4 w-4" />
+              Завершить
+            </Button>
           </div>
 
           <ProgressBar 
@@ -673,6 +733,57 @@ export default function ReviewPage() {
           )}
         </AnimatePresence>
       </div>
+      {/* Модальное окно подтверждения завершения */}
+      <AnimatePresence>
+        {showEndSessionModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50"
+            onClick={() => setShowEndSessionModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-lg p-6 max-w-md mx-4 shadow-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className="text-lg font-semibold text-gray-900 mb-3">
+                Завершить сессию?
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Ваш прогресс будет сохранен, но сессия завершится. Вы сможете начать новую тренировку позже.
+              </p>
+              
+              {/* Показываем текущий прогресс */}
+              <div className="bg-gray-50 rounded-lg p-3 mb-6">
+                <div className="text-sm text-gray-600">
+                  <div>Пройдено: <span className="font-semibold">{sessionStats.total}</span> из {sessionStats.totalWords}</div>
+                  <div>Правильно: <span className="font-semibold text-green-600">{sessionStats.correct}</span></div>
+                  <div>Осталось: <span className="font-semibold text-blue-600">{remainingWords}</span></div>
+                </div>
+              </div>
+              
+              <div className="flex gap-3 justify-end">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowEndSessionModal(false)}
+                >
+                  Продолжить
+                </Button>
+                <Button
+                  variant="destructive"
+                  onClick={handleEndSessionWithConfirmation}
+                >
+                  Да, завершить
+                </Button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
