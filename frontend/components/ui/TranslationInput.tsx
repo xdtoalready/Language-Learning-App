@@ -161,68 +161,155 @@ export function TranslationInput({
     }
   };
 
-  // ✅ Улучшенная функция оценки
-  const evaluateInput = async (input: string): Promise<InputEvaluation> => {
-    const cleanInput = (input || '').trim().toLowerCase();
-    const cleanExpected = (expectedAnswer || '').trim().toLowerCase();
-    
-    if (cleanInput === cleanExpected) {
-      return {
-        score: hints.length > 0 ? Math.max(2, 4 - hints.length) : 4,
-        reason: hints.length > 0 ? 'hint_used' : 'exact',
-        similarity: 1.0
-      };
-    }
-    
-    // Проверяем опечатки
-    const similarity = calculateSimilarity(cleanInput, cleanExpected);
-    
-    if (similarity >= 0.8) {
-      return {
-        score: hints.length > 0 ? Math.max(1, 3 - hints.length) : 3,
-        reason: 'typo',
-        similarity
-      };
-    }
-    
+  const parseTranslations = (translationString: string): string[] => {
+  return translationString
+    .split(',')
+    .map(t => t.trim())
+    .filter(t => t.length > 0);
+};
+
+const getPrimaryTranslation = (): string => {
+  const translations = parseTranslations(expectedAnswer);
+  return translations[0] || expectedAnswer;
+};
+
+  // функция оценки
+const evaluateInput = async (input: string): Promise<InputEvaluation> => {
+  const cleanInput = (input || '').trim().toLowerCase();
+  
+  if (!cleanInput) {
     return {
       score: 1,
-      reason: 'wrong',
-      similarity
+      reason: 'Ответ не может быть пустым',
+      suggestions: ['Попробуйте ввести перевод']
     };
-  };
+  }
 
-  const calculateSimilarity = (str1: string, str2: string): number => {
-    const longer = str1.length > str2.length ? str1 : str2;
-    const shorter = str1.length > str2.length ? str2 : str1;
+  // Парсим все возможные переводы
+  const possibleTranslations = parseTranslations(expectedAnswer);
+  
+  console.log('🔍 Проверяем ввод против вариантов:', {
+    userInput: cleanInput,
+    possibleTranslations,
+    hintsUsed: hints.length
+  });
+
+  let bestResult: InputEvaluation | null = null;
+  let bestScore = 0;
+
+  // Проверяем ввод против каждого возможного перевода
+  for (const translation of possibleTranslations) {
+    const cleanTranslation = translation.trim().toLowerCase();
+    const result = evaluateSingleTranslation(cleanInput, cleanTranslation);
     
-    if (longer.length === 0) return 1.0;
+    // Выбираем лучший результат
+    if (result.score > bestScore) {
+      bestScore = result.score;
+      bestResult = result;
+    }
     
-    const levenshteinDistance = (s1: string, s2: string): number => {
-      const matrix = Array(s2.length + 1).fill(null).map(() => Array(s1.length + 1).fill(null));
-      
-      for (let i = 0; i <= s1.length; i++) matrix[0][i] = i;
-      for (let j = 0; j <= s2.length; j++) matrix[j][0] = j;
-      
-      for (let j = 1; j <= s2.length; j++) {
-        for (let i = 1; i <= s1.length; i++) {
-          if (s1[i - 1] === s2[j - 1]) {
-            matrix[j][i] = matrix[j - 1][i - 1];
-          } else {
-            matrix[j][i] = Math.min(
-              matrix[j - 1][i - 1] + 1,
-              matrix[j][i - 1] + 1,
-              matrix[j - 1][i] + 1
-            );
-          }
-        }
-      }
-      
-      return matrix[s2.length][s1.length];
-    };
-    
-    return (longer.length - levenshteinDistance(longer, shorter)) / longer.length;
+    // Если нашли точное совпадение, можно не проверять остальные
+    if (result.score === 4 || (result.score === 2 && hints.length > 0)) {
+      break;
+    }
+  }
+
+  // Применяем штраф за подсказки
+  if (bestResult && hints.length > 0) {
+    bestResult.score = Math.min(bestResult.score, 2);
+    bestResult.reason = `${bestResult.reason} (с подсказками)`;
+  }
+
+  return bestResult || {
+    score: 1,
+    reason: 'Неправильный ответ',
+    suggestions: possibleTranslations.slice(0, 3)
   };
+};
+
+const evaluateSingleTranslation = (userInput: string, expectedTranslation: string): InputEvaluation => {
+  // Точное совпадение
+  if (userInput === expectedTranslation) {
+    return {
+      score: 4,
+      reason: 'Точный ответ!',
+      similarity: 1.0
+    };
+  }
+
+  // Проверяем пробелы (критически важно)
+  const userSpaces = (userInput.match(/\s/g) || []).length;
+  const expectedSpaces = (expectedTranslation.match(/\s/g) || []).length;
+  
+  if (userSpaces !== expectedSpaces) {
+    return {
+      score: 1,
+      reason: expectedSpaces > 0 
+        ? 'В ответе должны быть пробелы'
+        : 'В ответе не должно быть пробелов',
+      similarity: calculateSimilarity(userInput, expectedTranslation)
+    };
+  }
+
+  // Алгоритм Левенштейна для определения близости
+  const similarity = calculateSimilarity(userInput, expectedTranslation);
+  
+  // Определяем допустимое количество ошибок
+  const maxLength = Math.max(userInput.length, expectedTranslation.length);
+  const allowedErrors = Math.floor(maxLength * 0.2); // 20% ошибок максимум
+  const distance = calculateLevenshteinDistance(userInput, expectedTranslation);
+  
+  if (distance <= allowedErrors && similarity > 0.7) {
+    return {
+      score: 3,
+      reason: 'Хорошо! (небольшие опечатки)',
+      similarity,
+      suggestions: [expectedTranslation]
+    };
+  }
+
+  return {
+    score: 1,
+    reason: 'Неправильный ответ',
+    similarity,
+    suggestions: [expectedTranslation]
+  };
+};
+
+// Вспомогательные функции для расчета схожести
+const calculateSimilarity = (str1: string, str2: string): number => {
+  const distance = calculateLevenshteinDistance(str1, str2);
+  const maxLength = Math.max(str1.length, str2.length);
+  return maxLength === 0 ? 1 : 1 - (distance / maxLength);
+};
+
+const calculateLevenshteinDistance = (str1: string, str2: string): number => {
+  const matrix: number[][] = [];
+  
+  for (let i = 0; i <= str2.length; i++) {
+    matrix[i] = [i];
+  }
+  
+  for (let j = 0; j <= str1.length; j++) {
+    matrix[0][j] = j;
+  }
+  
+  for (let i = 1; i <= str2.length; i++) {
+    for (let j = 1; j <= str1.length; j++) {
+      if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j - 1] + 1,
+          matrix[i][j - 1] + 1, 
+          matrix[i - 1][j] + 1 
+        );
+      }
+    }
+  }
+  
+  return matrix[str2.length][str1.length];
+};
 
   const handleSubmit = async (e?: React.FormEvent) => {
     e?.preventDefault();
@@ -331,42 +418,65 @@ export function TranslationInput({
     }
   };
 
-  const createHintVisualization = () => {
-  if (!expectedAnswer) return null;
+const createHintVisualization = () => {
+  // Показываем прочерки только если есть подсказка длины
+  if (!lengthHint) {
+    return (
+      <div className="text-gray-500 text-sm">
+        Используйте подсказку "Длина" чтобы увидеть структуру слова
+      </div>
+    );
+  }
   
-  const answer = expectedAnswer.toLowerCase();
+  // Используем основной (первый) перевод для визуализации
+  const primaryTranslation = getPrimaryTranslation();
+  const answer = primaryTranslation.toLowerCase();
   const words = answer.split(' ');
   
-  return words.map((word, wordIndex) => (
-    <div key={wordIndex} className="inline-flex items-center">
-      {word.split('').map((char, charIndex) => {
-        const globalIndex = words.slice(0, wordIndex).join(' ').length + 
-                           (wordIndex > 0 ? 1 : 0) + charIndex;
-        
-        // Показываем первую букву если есть подсказка
-        const showFirstLetter = firstLetterHint && globalIndex === 0;
-        
-        return (
-          <div
-            key={charIndex}
-            className="inline-flex items-center justify-center w-8 h-10 mx-0.5 
-                       border-b-2 border-gray-400 text-lg font-mono"
-          >
-            {showFirstLetter ? (
-              <span className="text-blue-600 font-bold">{char.toUpperCase()}</span>
-            ) : (
-              <span className="text-transparent">_</span>
+  return (
+    <div className="space-y-2">
+      {/* Показываем все возможные варианты ответа */}
+      <div className="text-xs text-gray-500">
+        {parseTranslations(expectedAnswer).length > 1 && (
+          <span>Принимается любой из вариантов: {parseTranslations(expectedAnswer).join(', ')}</span>
+        )}
+      </div>
+      
+      {/* Визуализация основного варианта */}
+      <div className="flex flex-wrap justify-center items-center gap-1">
+        {words.map((word, wordIndex) => (
+          <div key={wordIndex} className="inline-flex items-center">
+            {word.split('').map((char, charIndex) => {
+              const globalIndex = words.slice(0, wordIndex).join(' ').length + 
+                                 (wordIndex > 0 ? 1 : 0) + charIndex;
+              
+              // Показываем первую букву если есть подсказка
+              const showFirstLetter = firstLetterHint && globalIndex === 0;
+              
+              return (
+                <div
+                  key={charIndex}
+                  className="inline-flex items-center justify-center w-8 h-10 mx-0.5 
+                             border-b-2 border-gray-400 text-lg font-mono"
+                >
+                  {showFirstLetter ? (
+                    <span className="text-blue-600 font-bold">{char.toUpperCase()}</span>
+                  ) : (
+                    <span className="text-transparent">_</span>
+                  )}
+                </div>
+              );
+            })}
+            {wordIndex < words.length - 1 && (
+              <div className="w-4 h-10 flex items-center justify-center">
+                <div className="w-2 h-0.5 bg-gray-400"></div>
+              </div>
             )}
           </div>
-        );
-      })}
-      {wordIndex < words.length - 1 && (
-        <div className="w-4 h-10 flex items-center justify-center">
-          <div className="w-2 h-0.5 bg-gray-400"></div>
-        </div>
-      )}
+        ))}
+      </div>
     </div>
-  ));
+  );
 };
 
 return (
