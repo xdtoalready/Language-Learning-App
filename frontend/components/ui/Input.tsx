@@ -7,7 +7,7 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
   helperText?: string;
   error?: string;
   variant?: 'default' | 'error';
-  wrapperClassName?: string; // ✅ Новый проп для управления классами обертки
+  wrapperClassName?: string;
 }
 
 export const Input = forwardRef<HTMLInputElement, InputProps>(
@@ -31,10 +31,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
     const currentVariant = error ? 'error' : variant;
 
     return (
-      <div className={cn(
-        "space-y-1 mb-4", // Дефолтные классы
-        wrapperClassName   // ✅ Возможность переопределить через проп
-      )}>
+      <div className={ wrapperClassName || "space-y-1 mb-4" }>
         {label && (
           <label className="block text-sm font-medium text-gray-700">
             {label}
