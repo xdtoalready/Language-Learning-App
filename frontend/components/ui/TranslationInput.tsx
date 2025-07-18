@@ -331,152 +331,220 @@ export function TranslationInput({
     }
   };
 
-  return (
-    <div className="w-full max-w-2xl mx-auto space-y-6">
-      {/* Заголовок и таймер */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-lg font-medium text-gray-900">
-          {getDirectionText()}
-        </h2>
-        <div className="flex items-center space-x-2 text-sm text-gray-600">
-          <ClockIcon className="h-4 w-4" />
-          <span>{timeSpent}с</span>
-        </div>
-      </div>
-
-      {/* Карточка слова */}
-      <Card className="border-2 border-blue-200">
-        <CardContent className="p-6 text-center">
-          <div className="space-y-2">
-            <h3 className="text-2xl font-bold text-gray-900">{word}</h3>
-            {transcription && (
-              <p className="text-gray-600 text-sm">[{transcription}]</p>
-            )}
-            {example && (
-              <p className="text-gray-500 text-sm italic">"{example}"</p>
+  const createHintVisualization = () => {
+  if (!expectedAnswer) return null;
+  
+  const answer = expectedAnswer.toLowerCase();
+  const words = answer.split(' ');
+  
+  return words.map((word, wordIndex) => (
+    <div key={wordIndex} className="inline-flex items-center">
+      {word.split('').map((char, charIndex) => {
+        const globalIndex = words.slice(0, wordIndex).join(' ').length + 
+                           (wordIndex > 0 ? 1 : 0) + charIndex;
+        
+        // Показываем первую букву если есть подсказка
+        const showFirstLetter = firstLetterHint && globalIndex === 0;
+        
+        return (
+          <div
+            key={charIndex}
+            className="inline-flex items-center justify-center w-8 h-10 mx-0.5 
+                       border-b-2 border-gray-400 text-lg font-mono"
+          >
+            {showFirstLetter ? (
+              <span className="text-blue-600 font-bold">{char.toUpperCase()}</span>
+            ) : (
+              <span className="text-transparent">_</span>
             )}
           </div>
-        </CardContent>
-      </Card>
-
-      {/* Поле ввода */}
-      <form onSubmit={handleSubmit} className="space-y-4">
-        <div className="relative">
-          <Input
-            ref={inputRef}
-            type="text"
-            value={userInput}
-            onChange={(e) => setUserInput(e.target.value)}
-            placeholder="Введите перевод..."
-            disabled={disabled || isSubmitted}
-            className={`text-lg py-3 pr-12 ${
-              isSubmitted && evaluation 
-                ? `border-2 ${evaluation.score >= 3 ? 'border-green-500' : 'border-red-500'}`
-                : 'border-gray-300'
-            }`}
-          />
-          {isEvaluating && (
-            <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-              <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-500"></div>
-            </div>
-          )}
+        );
+      })}
+      {wordIndex < words.length - 1 && (
+        <div className="w-4 h-10 flex items-center justify-center">
+          <div className="w-2 h-0.5 bg-gray-400"></div>
         </div>
+      )}
+    </div>
+  ));
+};
 
-        {/* Кнопки подсказок и отправки */}
-        <div className="flex flex-wrap gap-3">
-          {/* Кнопка подсказки длины */}
+return (
+  <div className="w-full max-w-2xl mx-auto space-y-6">
+    {/* Заголовок и таймер */}
+    <div className="flex items-center justify-between">
+      <h2 className="text-lg font-medium text-gray-900">
+        {getDirectionText()}
+      </h2>
+      <div className="flex items-center space-x-2 text-sm text-gray-600">
+        <ClockIcon className="h-4 w-4" />
+        <span>{timeSpent}с</span>
+      </div>
+    </div>
+
+    {/* Визуализация подсказок - "Поле чудес" */}
+    <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+      <CardContent className="p-6">
+        <div className="text-center space-y-4">
+          <div className="text-sm text-gray-600 font-medium">
+            Загаданное слово:
+          </div>
+          
+          {/* Прочерки с подсказками */}
+          <div className="flex flex-wrap justify-center items-center gap-1 min-h-[40px]">
+            {createHintVisualization()}
+          </div>
+          
+          {/* Информация о подсказках */}
+          <div className="flex flex-wrap justify-center gap-2 text-xs">
+            {lengthHint && (
+              <Badge variant="outline" className="text-blue-600 border-blue-300">
+                💡 {lengthHint}
+              </Badge>
+            )}
+            {firstLetterHint && (
+              <Badge variant="outline" className="text-green-600 border-green-300">
+                🎯 Первая буква открыта
+              </Badge>
+            )}
+            {hints.length === 0 && (
+              <span className="text-gray-500">Используйте подсказки для помощи</span>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+
+    {/* Поле ввода */}
+    <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="relative">
+        <Input
+          ref={inputRef}
+          type="text"
+          value={userInput}
+          onChange={(e) => setUserInput(e.target.value)}
+          placeholder="Введите перевод..."
+          disabled={disabled || isSubmitted}
+          wrapperClassName="mb-0" // Убираем отступ снизу
+          className={`text-lg py-3 pr-12 ${
+            isSubmitted && evaluation 
+              ? `border-2 ${evaluation.score >= 3 ? 'border-green-400' : 'border-red-400'}`
+              : ''
+          }`}
+        />
+        
+        {/* Индикатор загрузки или результата */}
+        {isEvaluating && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-blue-600"></div>
+          </div>
+        )}
+        
+        {evaluation && (
+          <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+            <div className={`p-1 rounded-full ${getScoreColor(evaluation.score)}`}>
+              {getScoreIcon(evaluation.score)}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Кнопки подсказок и действий */}
+      <div className="flex flex-wrap gap-3 justify-center">
+        {/* Подсказки */}
+        <div className="flex gap-2">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => handleHint('length')}
             disabled={disabled || isSubmitted || hints.some(h => h.type === 'length')}
-            className="flex items-center space-x-2"
+            className="flex items-center gap-2"
           >
             <LightBulbIcon className="h-4 w-4" />
-            <span>Длина</span>
-            {lengthHint && <Badge variant="secondary" className="ml-1">✓</Badge>}
+            Длина
           </Button>
-
-          {/* Кнопка подсказки первой буквы */}
+          
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => handleHint('first_letter')}
             disabled={disabled || isSubmitted || hints.some(h => h.type === 'first_letter')}
-            className="flex items-center space-x-2"
+            className="flex items-center gap-2"
           >
             <LightBulbIcon className="h-4 w-4" />
-            <span>Первая буква</span>
-            {firstLetterHint && <Badge variant="secondary" className="ml-1">✓</Badge>}
+            Первая буква
           </Button>
+        </div>
 
-          {/* Кнопка отправки */}
+        {/* Кнопка отправки/повтора */}
+        {!isSubmitted ? (
           <Button
             type="submit"
-            disabled={!userInput.trim() || isEvaluating || isSubmitted || disabled}
-            className="ml-auto"
+            disabled={!userInput.trim() || disabled || isEvaluating}
+            className="px-8"
           >
-            {isEvaluating ? 'Проверка...' : 'Проверить'}
+            {isEvaluating ? 'Проверяем...' : 'Проверить'}
           </Button>
-        </div>
-      </form>
-
-      {/* Результат оценки */}
-      <AnimatePresence>
-        {evaluation && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
+        ) : (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleRetry}
+            className="px-8"
           >
-            <Card className={`border-2 ${
-              evaluation.score >= 3 ? 'border-green-500 bg-green-50' : 'border-red-500 bg-red-50'
-            }`}>
-              <CardContent className="p-4">
-                <div className="flex items-center space-x-3">
-                  <div className={`p-2 rounded-full ${getScoreColor(evaluation.score)}`}>
-                    {getScoreIcon(evaluation.score)}
-                  </div>
-                  <div className="flex-1">
-                    <div className="flex items-center space-x-2">
-                      <span className="font-semibold">{getScoreText(evaluation.score)}</span>
-                      <Badge variant="outline">{evaluation.score}/4</Badge>
-                    </div>
-                    <div className="text-sm text-gray-600 mt-1">
-                      {evaluation.reason === 'exact' && 'Точный ответ'}
-                      {evaluation.reason === 'typo' && 'Есть опечатки'}
-                      {evaluation.reason === 'hint_used' && `Использовано подсказок: ${hints.length}`}
-                      {evaluation.reason === 'wrong' && `Правильный ответ: ${expectedAnswer}`}
-                    </div>
-                  </div>
-                  {evaluation.score < 3 && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleRetry}
-                      className="shrink-0"
-                    >
-                      Попробовать еще
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
+            Попробовать еще раз
+          </Button>
         )}
-      </AnimatePresence>
+      </div>
+    </form>
 
-      {/* Показываем использованные подсказки */}
-      {hints.length > 0 && (
-        <div className="text-center">
-          <div className="inline-flex items-center space-x-2 px-3 py-1 bg-yellow-100 text-yellow-800 rounded-full text-sm">
-            <LightBulbIcon className="h-4 w-4" />
-            <span>Использовано подсказок: {hints.length}</span>
-          </div>
-        </div>
+    {/* Результат оценки */}
+    <AnimatePresence>
+      {evaluation && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.9 }}
+          animate={{ opacity: 1, scale: 1 }}
+          exit={{ opacity: 0, scale: 0.9 }}
+          className="text-center"
+        >
+          <Card className={`border-2 ${
+            evaluation.score >= 3 ? 'border-green-400 bg-green-50' : 'border-red-400 bg-red-50'
+          }`}>
+            <CardContent className="p-4">
+              <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-lg font-semibold ${getScoreColor(evaluation.score)}`}>
+                {getScoreIcon(evaluation.score)}
+                {getScoreText(evaluation.score)}
+              </div>
+              
+              {evaluation.reason && (
+                <p className="mt-2 text-sm text-gray-600">
+                  {evaluation.reason}
+                </p>
+              )}
+              
+              {evaluation.correctAnswer && evaluation.correctAnswer !== userInput && (
+                <p className="mt-2 text-sm">
+                  <span className="text-gray-600">Правильный ответ: </span>
+                  <span className="font-semibold text-green-700">{evaluation.correctAnswer}</span>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </motion.div>
       )}
-    </div>
-  );
-}
+    </AnimatePresence>
+
+    {/* Индикаторы использованных подсказок */}
+    {hints.length > 0 && !isSubmitted && (
+      <div className="text-center">
+        <div className="inline-flex items-center gap-2 px-3 py-1 bg-orange-100 text-orange-700 rounded-full text-sm">
+          <LightBulbIcon className="h-4 w-4" />
+          Использовано подсказок: {hints.length}/2
+          <span className="text-xs">(макс. 2 балла)</span>
+        </div>
+      </div>
+    )}
+  </div>
+);
